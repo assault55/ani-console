@@ -1,0 +1,18 @@
+/* Tailwind：仅 theme + utilities；不引入 preflight，避免与 Arco 重置冲突 */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* 壳层基础：与 Arco Token 对齐，不另起色板 */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family, system-ui, sans-serif);
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+}

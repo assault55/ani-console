@@ -1,0 +1,53 @@
+{
+  "name": "ani-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "codegen": "bash scripts/codegen.sh",
+    "setup:e2e": "npx playwright install chromium && npx playwright install-deps chromium",
+    "pretest:e2e": "node scripts/ensure-e2e.mjs",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:mock-server": "playwright test -c playwright.mock-server.config.ts",
+    "test:e2e:ui": "playwright test --ui",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "verify": "npm run codegen && npm run typecheck && npm run test && npm run test:e2e && npm run build"
+  },
+  "dependencies": {
+    "@arco-design/web-react": "^2.66.1",
+    "@tanstack/react-query": "^5.80.7",
+    "@tanstack/react-router": "^1.121.21",
+    "echarts": "^5.6.0",
+    "echarts-for-react": "^3.0.2",
+    "openapi-fetch": "^0.14.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.1",
+    "@tanstack/router-devtools": "^1.121.21",
+    "@tanstack/router-plugin": "^1.121.21",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.15.21",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "jsdom": "^26.1.0",
+    "openapi-typescript": "^7.8.0",
+    "oxlint": "^1.69.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}
