@@ -34,14 +34,21 @@ import { Route as AuthenticatedAuditIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedVolumesVolumeIdRouteImport } from './routes/_authenticated/volumes/$volumeId'
 import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_authenticated/settings/api-keys'
 import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets/$secretId'
+import { Route as AuthenticatedObjectsBucketIdRouteImport } from './routes/_authenticated/objects/$bucketId'
+import { Route as AuthenticatedInstancesVmRouteImport } from './routes/_authenticated/instances/vm'
+import { Route as AuthenticatedInstancesSandboxRouteImport } from './routes/_authenticated/instances/sandbox'
+import { Route as AuthenticatedInstancesGpuRouteImport } from './routes/_authenticated/instances/gpu'
+import { Route as AuthenticatedInstancesContainerRouteImport } from './routes/_authenticated/instances/container'
 import { Route as AuthenticatedInstancesInstanceIdRouteImport } from './routes/_authenticated/instances/$instanceId'
 import { Route as AuthenticatedInstanceOperationsOperationIdRouteImport } from './routes/_authenticated/instance-operations/$operationId'
 import { Route as AuthenticatedFilesystemsFilesystemIdRouteImport } from './routes/_authenticated/filesystems/$filesystemId'
+import { Route as AuthenticatedObjectsBucketIdIndexRouteImport } from './routes/_authenticated/objects/$bucketId/index'
 import { Route as AuthenticatedNetworksVpcsIndexRouteImport } from './routes/_authenticated/networks/vpcs/index'
 import { Route as AuthenticatedNetworksSubnetsIndexRouteImport } from './routes/_authenticated/networks/subnets/index'
 import { Route as AuthenticatedNetworksSecurityGroupsIndexRouteImport } from './routes/_authenticated/networks/security-groups/index'
 import { Route as AuthenticatedNetworksRoutesIndexRouteImport } from './routes/_authenticated/networks/routes/index'
 import { Route as AuthenticatedNetworksLoadBalancersIndexRouteImport } from './routes/_authenticated/networks/load-balancers/index'
+import { Route as AuthenticatedObjectsBucketIdObjectIdRouteImport } from './routes/_authenticated/objects/$bucketId/$objectId'
 import { Route as AuthenticatedInstancesInstanceIdOperationsRouteImport } from './routes/_authenticated/instances/$instanceId.operations'
 
 const LoginRoute = LoginRouteImport.update({
@@ -186,6 +193,36 @@ const AuthenticatedSecretsSecretIdRoute =
     path: '/secrets/$secretId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedObjectsBucketIdRoute =
+  AuthenticatedObjectsBucketIdRouteImport.update({
+    id: '/objects/$bucketId',
+    path: '/objects/$bucketId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstancesVmRoute =
+  AuthenticatedInstancesVmRouteImport.update({
+    id: '/instances/vm',
+    path: '/instances/vm',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstancesSandboxRoute =
+  AuthenticatedInstancesSandboxRouteImport.update({
+    id: '/instances/sandbox',
+    path: '/instances/sandbox',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstancesGpuRoute =
+  AuthenticatedInstancesGpuRouteImport.update({
+    id: '/instances/gpu',
+    path: '/instances/gpu',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstancesContainerRoute =
+  AuthenticatedInstancesContainerRouteImport.update({
+    id: '/instances/container',
+    path: '/instances/container',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedInstancesInstanceIdRoute =
   AuthenticatedInstancesInstanceIdRouteImport.update({
     id: '/instances/$instanceId',
@@ -203,6 +240,12 @@ const AuthenticatedFilesystemsFilesystemIdRoute =
     id: '/filesystems/$filesystemId',
     path: '/filesystems/$filesystemId',
     getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedObjectsBucketIdIndexRoute =
+  AuthenticatedObjectsBucketIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedObjectsBucketIdRoute,
   } as any)
 const AuthenticatedNetworksVpcsIndexRoute =
   AuthenticatedNetworksVpcsIndexRouteImport.update({
@@ -234,6 +277,12 @@ const AuthenticatedNetworksLoadBalancersIndexRoute =
     path: '/networks/load-balancers/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedObjectsBucketIdObjectIdRoute =
+  AuthenticatedObjectsBucketIdObjectIdRouteImport.update({
+    id: '/$objectId',
+    path: '/$objectId',
+    getParentRoute: () => AuthenticatedObjectsBucketIdRoute,
+  } as any)
 const AuthenticatedInstancesInstanceIdOperationsRoute =
   AuthenticatedInstancesInstanceIdOperationsRouteImport.update({
     id: '/operations',
@@ -249,6 +298,11 @@ export interface FileRoutesByFullPath {
   '/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
+  '/instances/container': typeof AuthenticatedInstancesContainerRoute
+  '/instances/gpu': typeof AuthenticatedInstancesGpuRoute
+  '/instances/sandbox': typeof AuthenticatedInstancesSandboxRoute
+  '/instances/vm': typeof AuthenticatedInstancesVmRoute
+  '/objects/$bucketId': typeof AuthenticatedObjectsBucketIdRouteWithChildren
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
@@ -270,11 +324,13 @@ export interface FileRoutesByFullPath {
   '/vector-stores/': typeof AuthenticatedVectorStoresIndexRoute
   '/volumes/': typeof AuthenticatedVolumesIndexRoute
   '/instances/$instanceId/operations': typeof AuthenticatedInstancesInstanceIdOperationsRoute
+  '/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/networks/load-balancers/': typeof AuthenticatedNetworksLoadBalancersIndexRoute
   '/networks/routes/': typeof AuthenticatedNetworksRoutesIndexRoute
   '/networks/security-groups/': typeof AuthenticatedNetworksSecurityGroupsIndexRoute
   '/networks/subnets/': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/networks/vpcs/': typeof AuthenticatedNetworksVpcsIndexRoute
+  '/objects/$bucketId/': typeof AuthenticatedObjectsBucketIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/login/callback': typeof LoginCallbackRoute
@@ -283,6 +339,10 @@ export interface FileRoutesByTo {
   '/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
+  '/instances/container': typeof AuthenticatedInstancesContainerRoute
+  '/instances/gpu': typeof AuthenticatedInstancesGpuRoute
+  '/instances/sandbox': typeof AuthenticatedInstancesSandboxRoute
+  '/instances/vm': typeof AuthenticatedInstancesVmRoute
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
@@ -304,11 +364,13 @@ export interface FileRoutesByTo {
   '/vector-stores': typeof AuthenticatedVectorStoresIndexRoute
   '/volumes': typeof AuthenticatedVolumesIndexRoute
   '/instances/$instanceId/operations': typeof AuthenticatedInstancesInstanceIdOperationsRoute
+  '/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/networks/load-balancers': typeof AuthenticatedNetworksLoadBalancersIndexRoute
   '/networks/routes': typeof AuthenticatedNetworksRoutesIndexRoute
   '/networks/security-groups': typeof AuthenticatedNetworksSecurityGroupsIndexRoute
   '/networks/subnets': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/networks/vpcs': typeof AuthenticatedNetworksVpcsIndexRoute
+  '/objects/$bucketId': typeof AuthenticatedObjectsBucketIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -320,6 +382,11 @@ export interface FileRoutesById {
   '/_authenticated/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/_authenticated/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/_authenticated/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
+  '/_authenticated/instances/container': typeof AuthenticatedInstancesContainerRoute
+  '/_authenticated/instances/gpu': typeof AuthenticatedInstancesGpuRoute
+  '/_authenticated/instances/sandbox': typeof AuthenticatedInstancesSandboxRoute
+  '/_authenticated/instances/vm': typeof AuthenticatedInstancesVmRoute
+  '/_authenticated/objects/$bucketId': typeof AuthenticatedObjectsBucketIdRouteWithChildren
   '/_authenticated/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/_authenticated/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/_authenticated/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
@@ -341,11 +408,13 @@ export interface FileRoutesById {
   '/_authenticated/vector-stores/': typeof AuthenticatedVectorStoresIndexRoute
   '/_authenticated/volumes/': typeof AuthenticatedVolumesIndexRoute
   '/_authenticated/instances/$instanceId/operations': typeof AuthenticatedInstancesInstanceIdOperationsRoute
+  '/_authenticated/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/_authenticated/networks/load-balancers/': typeof AuthenticatedNetworksLoadBalancersIndexRoute
   '/_authenticated/networks/routes/': typeof AuthenticatedNetworksRoutesIndexRoute
   '/_authenticated/networks/security-groups/': typeof AuthenticatedNetworksSecurityGroupsIndexRoute
   '/_authenticated/networks/subnets/': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/_authenticated/networks/vpcs/': typeof AuthenticatedNetworksVpcsIndexRoute
+  '/_authenticated/objects/$bucketId/': typeof AuthenticatedObjectsBucketIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -357,6 +426,11 @@ export interface FileRouteTypes {
     | '/filesystems/$filesystemId'
     | '/instance-operations/$operationId'
     | '/instances/$instanceId'
+    | '/instances/container'
+    | '/instances/gpu'
+    | '/instances/sandbox'
+    | '/instances/vm'
+    | '/objects/$bucketId'
     | '/secrets/$secretId'
     | '/settings/api-keys'
     | '/volumes/$volumeId'
@@ -378,11 +452,13 @@ export interface FileRouteTypes {
     | '/vector-stores/'
     | '/volumes/'
     | '/instances/$instanceId/operations'
+    | '/objects/$bucketId/$objectId'
     | '/networks/load-balancers/'
     | '/networks/routes/'
     | '/networks/security-groups/'
     | '/networks/subnets/'
     | '/networks/vpcs/'
+    | '/objects/$bucketId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login/callback'
@@ -391,6 +467,10 @@ export interface FileRouteTypes {
     | '/filesystems/$filesystemId'
     | '/instance-operations/$operationId'
     | '/instances/$instanceId'
+    | '/instances/container'
+    | '/instances/gpu'
+    | '/instances/sandbox'
+    | '/instances/vm'
     | '/secrets/$secretId'
     | '/settings/api-keys'
     | '/volumes/$volumeId'
@@ -412,11 +492,13 @@ export interface FileRouteTypes {
     | '/vector-stores'
     | '/volumes'
     | '/instances/$instanceId/operations'
+    | '/objects/$bucketId/$objectId'
     | '/networks/load-balancers'
     | '/networks/routes'
     | '/networks/security-groups'
     | '/networks/subnets'
     | '/networks/vpcs'
+    | '/objects/$bucketId'
   id:
     | '__root__'
     | '/_authenticated'
@@ -427,6 +509,11 @@ export interface FileRouteTypes {
     | '/_authenticated/filesystems/$filesystemId'
     | '/_authenticated/instance-operations/$operationId'
     | '/_authenticated/instances/$instanceId'
+    | '/_authenticated/instances/container'
+    | '/_authenticated/instances/gpu'
+    | '/_authenticated/instances/sandbox'
+    | '/_authenticated/instances/vm'
+    | '/_authenticated/objects/$bucketId'
     | '/_authenticated/secrets/$secretId'
     | '/_authenticated/settings/api-keys'
     | '/_authenticated/volumes/$volumeId'
@@ -448,11 +535,13 @@ export interface FileRouteTypes {
     | '/_authenticated/vector-stores/'
     | '/_authenticated/volumes/'
     | '/_authenticated/instances/$instanceId/operations'
+    | '/_authenticated/objects/$bucketId/$objectId'
     | '/_authenticated/networks/load-balancers/'
     | '/_authenticated/networks/routes/'
     | '/_authenticated/networks/security-groups/'
     | '/_authenticated/networks/subnets/'
     | '/_authenticated/networks/vpcs/'
+    | '/_authenticated/objects/$bucketId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -637,6 +726,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSecretsSecretIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/objects/$bucketId': {
+      id: '/_authenticated/objects/$bucketId'
+      path: '/objects/$bucketId'
+      fullPath: '/objects/$bucketId'
+      preLoaderRoute: typeof AuthenticatedObjectsBucketIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instances/vm': {
+      id: '/_authenticated/instances/vm'
+      path: '/instances/vm'
+      fullPath: '/instances/vm'
+      preLoaderRoute: typeof AuthenticatedInstancesVmRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instances/sandbox': {
+      id: '/_authenticated/instances/sandbox'
+      path: '/instances/sandbox'
+      fullPath: '/instances/sandbox'
+      preLoaderRoute: typeof AuthenticatedInstancesSandboxRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instances/gpu': {
+      id: '/_authenticated/instances/gpu'
+      path: '/instances/gpu'
+      fullPath: '/instances/gpu'
+      preLoaderRoute: typeof AuthenticatedInstancesGpuRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instances/container': {
+      id: '/_authenticated/instances/container'
+      path: '/instances/container'
+      fullPath: '/instances/container'
+      preLoaderRoute: typeof AuthenticatedInstancesContainerRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/instances/$instanceId': {
       id: '/_authenticated/instances/$instanceId'
       path: '/instances/$instanceId'
@@ -657,6 +781,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/filesystems/$filesystemId'
       preLoaderRoute: typeof AuthenticatedFilesystemsFilesystemIdRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/objects/$bucketId/': {
+      id: '/_authenticated/objects/$bucketId/'
+      path: '/'
+      fullPath: '/objects/$bucketId/'
+      preLoaderRoute: typeof AuthenticatedObjectsBucketIdIndexRouteImport
+      parentRoute: typeof AuthenticatedObjectsBucketIdRoute
     }
     '/_authenticated/networks/vpcs/': {
       id: '/_authenticated/networks/vpcs/'
@@ -693,6 +824,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedNetworksLoadBalancersIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/objects/$bucketId/$objectId': {
+      id: '/_authenticated/objects/$bucketId/$objectId'
+      path: '/$objectId'
+      fullPath: '/objects/$bucketId/$objectId'
+      preLoaderRoute: typeof AuthenticatedObjectsBucketIdObjectIdRouteImport
+      parentRoute: typeof AuthenticatedObjectsBucketIdRoute
+    }
     '/_authenticated/instances/$instanceId/operations': {
       id: '/_authenticated/instances/$instanceId/operations'
       path: '/operations'
@@ -718,11 +856,34 @@ const AuthenticatedInstancesInstanceIdRouteWithChildren =
     AuthenticatedInstancesInstanceIdRouteChildren,
   )
 
+interface AuthenticatedObjectsBucketIdRouteChildren {
+  AuthenticatedObjectsBucketIdObjectIdRoute: typeof AuthenticatedObjectsBucketIdObjectIdRoute
+  AuthenticatedObjectsBucketIdIndexRoute: typeof AuthenticatedObjectsBucketIdIndexRoute
+}
+
+const AuthenticatedObjectsBucketIdRouteChildren: AuthenticatedObjectsBucketIdRouteChildren =
+  {
+    AuthenticatedObjectsBucketIdObjectIdRoute:
+      AuthenticatedObjectsBucketIdObjectIdRoute,
+    AuthenticatedObjectsBucketIdIndexRoute:
+      AuthenticatedObjectsBucketIdIndexRoute,
+  }
+
+const AuthenticatedObjectsBucketIdRouteWithChildren =
+  AuthenticatedObjectsBucketIdRoute._addFileChildren(
+    AuthenticatedObjectsBucketIdRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedFilesystemsFilesystemIdRoute: typeof AuthenticatedFilesystemsFilesystemIdRoute
   AuthenticatedInstanceOperationsOperationIdRoute: typeof AuthenticatedInstanceOperationsOperationIdRoute
   AuthenticatedInstancesInstanceIdRoute: typeof AuthenticatedInstancesInstanceIdRouteWithChildren
+  AuthenticatedInstancesContainerRoute: typeof AuthenticatedInstancesContainerRoute
+  AuthenticatedInstancesGpuRoute: typeof AuthenticatedInstancesGpuRoute
+  AuthenticatedInstancesSandboxRoute: typeof AuthenticatedInstancesSandboxRoute
+  AuthenticatedInstancesVmRoute: typeof AuthenticatedInstancesVmRoute
+  AuthenticatedObjectsBucketIdRoute: typeof AuthenticatedObjectsBucketIdRouteWithChildren
   AuthenticatedSecretsSecretIdRoute: typeof AuthenticatedSecretsSecretIdRoute
   AuthenticatedSettingsApiKeysRoute: typeof AuthenticatedSettingsApiKeysRoute
   AuthenticatedVolumesVolumeIdRoute: typeof AuthenticatedVolumesVolumeIdRoute
@@ -758,6 +919,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedInstanceOperationsOperationIdRoute,
   AuthenticatedInstancesInstanceIdRoute:
     AuthenticatedInstancesInstanceIdRouteWithChildren,
+  AuthenticatedInstancesContainerRoute: AuthenticatedInstancesContainerRoute,
+  AuthenticatedInstancesGpuRoute: AuthenticatedInstancesGpuRoute,
+  AuthenticatedInstancesSandboxRoute: AuthenticatedInstancesSandboxRoute,
+  AuthenticatedInstancesVmRoute: AuthenticatedInstancesVmRoute,
+  AuthenticatedObjectsBucketIdRoute:
+    AuthenticatedObjectsBucketIdRouteWithChildren,
   AuthenticatedSecretsSecretIdRoute: AuthenticatedSecretsSecretIdRoute,
   AuthenticatedSettingsApiKeysRoute: AuthenticatedSettingsApiKeysRoute,
   AuthenticatedVolumesVolumeIdRoute: AuthenticatedVolumesVolumeIdRoute,

@@ -22,7 +22,10 @@ const menuItems = [
     label: '算力与实例',
     icon: <IconCloud />,
     children: [
-      { key: '/instances', label: '实例' },
+      { key: '/instances/container', label: '容器实例' },
+      { key: '/instances/vm', label: 'VM 实例' },
+      { key: '/instances/gpu', label: 'GPU 容器实例' },
+      { key: '/instances/sandbox', label: 'Sandbox 实例' },
       { key: '/gpu-inventory', label: 'GPU 清单' },
       { key: '/sandbox-templates', label: 'Sandbox 模板' },
     ],

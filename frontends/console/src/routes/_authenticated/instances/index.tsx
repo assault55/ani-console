@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Form, Input, InputNumber, Modal, Select, Switch } from '@arco-design/web-react'
+import { Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Typography } from '@arco-design/web-react'
 import { useState } from 'react'
 import { coreApi } from '@/api/client'
 import { newIdempotencyKey } from '@/lib/idempotency'
@@ -13,12 +13,16 @@ import { AsyncTaskPoller } from '@/components/feedback/AsyncTaskPoller'
 import type { components } from '@/api/core-schema'
 
 export const Route = createFileRoute('/_authenticated/instances/')({
-  component: InstancesListPage,
+  component: () => <InstancesListPage />,
 })
 
 type Instance = components['schemas']['InstanceRecord']
 type CreateInstanceRequest = components['schemas']['CreateInstanceRequest']
 type InstanceKind = CreateInstanceRequest['kind']
+
+const VM_BOOT_IMAGE = 'quay.io/kubevirt/cirros-container-disk-demo:v1.2.0'
+const CONTAINER_IMAGE = 'dockerproxy.net/library/nginx:1.27-alpine'
+const INSTANCE_LIST_POLL_MS = 5000
 
 type InstanceFormState = {
   name: string
@@ -40,15 +44,57 @@ type InstanceFormState = {
   sandbox_network_egress_policy: components['schemas']['SandboxNetworkEgressPolicy']
 }
 
+const kindDefaults: Record<InstanceKind, Partial<InstanceFormState>> = {
+  vm: {
+    image: '',
+    boot_image: VM_BOOT_IMAGE,
+    ssh_username: 'cirros',
+    cpu: '2',
+    memory: '4Gi',
+    replicas: 1,
+  },
+  container: {
+    image: CONTAINER_IMAGE,
+    boot_image: '',
+    cpu: '2',
+    memory: '4Gi',
+    replicas: 1,
+  },
+  gpu_container: {
+    image: CONTAINER_IMAGE,
+    boot_image: '',
+    cpu: '4',
+    memory: '8Gi',
+    gpu_vendor: 'nvidia',
+    gpu_model: 'A100',
+    gpu_count: 1,
+    replicas: 1,
+  },
+  sandbox: {
+    image: '',
+    boot_image: '',
+    sandbox_runtime_class: 'sandbox-kata',
+    sandbox_session_timeout: '30m',
+    sandbox_network_egress_policy: 'deny_all',
+  },
+}
+
+const kindOptionMeta: Array<{ kind: InstanceKind; label: string; desc: string }> = [
+  { kind: 'container', label: '容器', desc: '标准容器实例，适合 Web/API 服务。' },
+  { kind: 'vm', label: 'VM', desc: 'KubeVirt 虚拟机实例，支持 SSH/系统级运行环境。' },
+  { kind: 'gpu_container', label: 'GPU 容器', desc: '带 GPU 资源请求的容器实例。' },
+  { kind: 'sandbox', label: 'Sandbox', desc: '隔离运行环境，带会话时长与出口策略。' },
+]
+
 const defaultInstanceForm: InstanceFormState = {
   name: '',
   kind: 'container',
-  image: '',
+  image: CONTAINER_IMAGE,
   cpu: '2',
   memory: '4Gi',
   auto_start: true,
   boot_image: '',
-  ssh_username: 'ubuntu',
+  ssh_username: 'cirros',
   ssh_key_ref: '',
   termination_protection: false,
   gpu_vendor: '',
@@ -58,6 +104,22 @@ const defaultInstanceForm: InstanceFormState = {
   sandbox_runtime_class: 'sandbox-kata',
   sandbox_session_timeout: '30m',
   sandbox_network_egress_policy: 'deny_all',
+}
+
+type InstancesListPageProps = {
+  kindFilter?: InstanceKind
+  lockKind?: boolean
+  title?: string
+  subtitle?: string
+}
+
+function createDefaultForm(kindFilter?: InstanceKind): InstanceFormState {
+  if (!kindFilter) return { ...defaultInstanceForm }
+  return {
+    ...defaultInstanceForm,
+    kind: kindFilter,
+    ...kindDefaults[kindFilter],
+  }
 }
 
 function optionalTrimmed(value: string) {
@@ -107,19 +169,23 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
   return body
 }
 
-function InstancesListPage() {
+export function InstancesListPage(props: InstancesListPageProps = {}) {
+  const { kindFilter, lockKind = false, title = '实例', subtitle = 'VM / 容器 / GPU 容器 / Sandbox' } = props
   const qc = useQueryClient()
   const [visible, setVisible] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
-  const [form, setForm] = useState<InstanceFormState>(defaultInstanceForm)
+  const [form, setForm] = useState<InstanceFormState>(createDefaultForm(kindFilter))
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['instances'],
+    queryKey: ['instances', kindFilter ?? 'all'],
     queryFn: async () => {
-      const { data, error } = await coreApi.GET('/instances', { params: { query: { limit: 50 } } })
+      const listKind = kindFilter === 'sandbox' ? undefined : kindFilter
+      const { data, error } = await coreApi.GET('/instances', { params: { query: { limit: 50, kind: listKind } } })
       if (error) throw error
       return data
     },
+    refetchInterval: INSTANCE_LIST_POLL_MS,
+    refetchIntervalInBackground: false,
   })
 
   const create = useMutation({
@@ -132,19 +198,19 @@ function InstancesListPage() {
     },
     onSuccess: () => {
       setVisible(false)
-      setForm(defaultInstanceForm)
+      setForm(createDefaultForm(kindFilter))
       qc.invalidateQueries({ queryKey: ['instances'] })
     },
     onError: (e) => showApiError(e),
   })
 
-  const items = (data?.items ?? []) as Instance[]
+  const items = ((data?.items ?? []) as Instance[]).filter((item) => item.state !== 'deleted')
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="实例"
-        subtitle="VM / 容器 / GPU 容器 / Sandbox"
+        title={title}
+        subtitle={subtitle}
         extra={
           <Button type="primary" onClick={() => setVisible(true)}>
             创建实例
@@ -174,7 +240,7 @@ function InstancesListPage() {
       />
       <Modal
         visible={visible}
-        title="创建实例"
+        title={kindFilter ? `创建${kindOptionMeta.find((k) => k.kind === kindFilter)?.label ?? '实例'}` : '创建实例'}
         onCancel={() => setVisible(false)}
         onOk={() => create.mutateAsync()}
         confirmLoading={create.isPending}
@@ -183,14 +249,28 @@ function InstancesListPage() {
           <Form.Item label="名称" required>
             <Input value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
           </Form.Item>
-          <Form.Item label="类型">
-            <Select value={form.kind} onChange={(v) => setForm((f) => ({ ...f, kind: v }))}>
-              <Select.Option value="vm">VM</Select.Option>
-              <Select.Option value="container">容器</Select.Option>
-              <Select.Option value="gpu_container">GPU 容器</Select.Option>
-              <Select.Option value="sandbox">Sandbox</Select.Option>
-            </Select>
-          </Form.Item>
+          {!lockKind ? (
+            <Form.Item label="类型">
+              <Space wrap size={8}>
+                {kindOptionMeta.map((option) => (
+                  <Button
+                    key={option.kind}
+                    type={form.kind === option.kind ? 'primary' : 'outline'}
+                    onClick={() => setForm((f) => ({ ...f, kind: option.kind, ...kindDefaults[option.kind] }))}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </Space>
+              <Typography.Paragraph type="secondary" className="!mt-2 !mb-0">
+                {kindOptionMeta.find((item) => item.kind === form.kind)?.desc}
+              </Typography.Paragraph>
+            </Form.Item>
+          ) : (
+            <Form.Item label="类型">
+              <Typography.Text>{kindOptionMeta.find((item) => item.kind === form.kind)?.label}</Typography.Text>
+            </Form.Item>
+          )}
           <Form.Item label="CPU">
             <Input value={form.cpu} onChange={(v) => setForm((f) => ({ ...f, cpu: v }))} placeholder="2" />
           </Form.Item>
@@ -200,7 +280,11 @@ function InstancesListPage() {
           {(form.kind === 'container' || form.kind === 'gpu_container') ? (
             <>
               <Form.Item label="镜像" required>
-                <Input value={form.image} onChange={(v) => setForm((f) => ({ ...f, image: v }))} />
+                <Input
+                  value={form.image}
+                  onChange={(v) => setForm((f) => ({ ...f, image: v }))}
+                  placeholder={CONTAINER_IMAGE}
+                />
               </Form.Item>
               <Form.Item label="副本数">
                 <InputNumber
@@ -215,7 +299,11 @@ function InstancesListPage() {
           {form.kind === 'vm' ? (
             <>
               <Form.Item label="Boot Image" required>
-                <Input value={form.boot_image} onChange={(v) => setForm((f) => ({ ...f, boot_image: v }))} />
+                <Input
+                  value={form.boot_image}
+                  onChange={(v) => setForm((f) => ({ ...f, boot_image: v }))}
+                  placeholder={VM_BOOT_IMAGE}
+                />
               </Form.Item>
               <Form.Item label="SSH 用户名">
                 <Input value={form.ssh_username} onChange={(v) => setForm((f) => ({ ...f, ssh_username: v }))} />

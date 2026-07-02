@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Message,
   Modal,
   Select,
   Space,
@@ -30,6 +31,16 @@ import type { components } from '@/api/core-schema'
 export const Route = createFileRoute('/_authenticated/instances/$instanceId')({
   component: InstanceDetailPage,
 })
+
+const INSTANCE_DETAIL_POLL_MS = 3000
+
+function getErrorText(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message
+  }
+  return ''
+}
 
 function TabQueryBody<T>({
   query,
@@ -65,6 +76,7 @@ function InstanceDetailPage() {
   const [execTty, setExecTty] = useState(true)
   const [execRows, setExecRows] = useState(24)
   const [execCols, setExecCols] = useState(80)
+  const [consoleUnavailableReason, setConsoleUnavailableReason] = useState<string | null>(null)
 
   const detail = useQuery({
     queryKey: ['instance', instanceId],
@@ -75,6 +87,8 @@ function InstanceDetailPage() {
       if (error) throw error
       return data
     },
+    refetchInterval: INSTANCE_DETAIL_POLL_MS,
+    refetchIntervalInBackground: false,
   })
 
   const logs = useQuery({
@@ -147,7 +161,16 @@ function InstanceDetailPage() {
       if (data?.url) window.open(data.url, '_blank')
     },
     onSuccess: () => setConsoleVisible(false),
-    onError: (e) => showApiError(e),
+    onError: (e) => {
+      const message = getErrorText(e)
+      if (message.includes('/vnc') && message.includes('HTTP 406')) {
+        setConsoleUnavailableReason('当前集群/网关链路未正确支持 KubeVirt Console/VNC 通道（HTTP 406）')
+        setConsoleVisible(false)
+        Message.error('当前环境不支持 VNC 表示格式，请改用 serial 或 console 协议后重试。')
+        return
+      }
+      showApiError(e)
+    },
   })
 
   const openExec = useMutation({
@@ -205,8 +228,13 @@ function InstanceDetailPage() {
         subtitle={`实例详情 · ${inst?.kind ?? ''}`}
         extra={
           <Space wrap>
-            <Button type="primary" loading={openConsole.isPending} onClick={() => setConsoleVisible(true)}>
-              控制台
+            <Button
+              type="primary"
+              loading={openConsole.isPending}
+              disabled={Boolean(consoleUnavailableReason)}
+              onClick={() => setConsoleVisible(true)}
+            >
+              {consoleUnavailableReason ? '控制台（不可用）' : '控制台'}
             </Button>
             <Button type="outline" loading={openExec.isPending} onClick={() => setExecVisible(true)}>
               终端
@@ -226,6 +254,11 @@ function InstanceDetailPage() {
           </Space>
         }
       />
+      {consoleUnavailableReason ? (
+        <Card>
+          <div className="text-[var(--color-text-2)]">{consoleUnavailableReason}</div>
+        </Card>
+      ) : null}
       <Card>
         <Descriptions
           column={{ xs: 1, sm: 2, md: 3 }}
