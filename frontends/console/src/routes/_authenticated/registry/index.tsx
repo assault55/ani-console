@@ -7,7 +7,9 @@ import {
   Empty,
   Form,
   Input,
+  Message,
   Modal,
+  Radio,
   Select,
   Space,
   Spin,
@@ -30,6 +32,11 @@ type RegistryProject = components['schemas']['RegistryProject']
 type RegistryRepository = components['schemas']['RegistryRepository']
 type RegistryArtifact = components['schemas']['RegistryArtifact']
 type RegistryAction = components['schemas']['SetRegistryPermissionRequest']['actions'][number]
+type RegistryPullSecretKubernetesApply = components['schemas']['RegistryPullSecretKubernetesApply']
+
+type PullSecretMode = 'create-only' | 'kubernetes-apply'
+
+const K8S_DOCKER_CONFIG_SECRET_TYPE = 'kubernetes.io/dockerconfigjson'
 
 export const Route = createFileRoute('/_authenticated/registry/')({
   component: RegistryPage,
@@ -46,8 +53,10 @@ function RegistryPage() {
   const [permissionSubject, setPermissionSubject] = useState('developers')
   const [permissionActions, setPermissionActions] = useState<RegistryAction[]>(['pull', 'push'])
   const [pullSecretVisible, setPullSecretVisible] = useState(false)
+  const [pullSecretMode, setPullSecretMode] = useState<PullSecretMode>('create-only')
   const [pullSecretName, setPullSecretName] = useState('ani-registry-pull')
   const [pullSecretNamespace, setPullSecretNamespace] = useState('')
+  const [pullSecretApplyResult, setPullSecretApplyResult] = useState<RegistryPullSecretKubernetesApply | null>(null)
   const [scanImage, setScanImage] = useState('')
   const [scanResult, setScanResult] = useState<components['schemas']['RegistryScanResult'] | null>(null)
 
@@ -118,19 +127,56 @@ function RegistryPage() {
     onError: (e) => showApiError(e),
   })
 
+  const resetPullSecretForm = () => {
+    setPullSecretMode('create-only')
+    setPullSecretName('ani-registry-pull')
+    setPullSecretNamespace('')
+  }
+
+  const openPullSecretModal = () => {
+    resetPullSecretForm()
+    setPullSecretVisible(true)
+  }
+
+  const submitPullSecret = () => {
+    const namespace = pullSecretNamespace.trim()
+    if (pullSecretMode === 'kubernetes-apply' && !namespace) {
+      Message.error('创建并应用到 Kubernetes 时，Namespace 为必填项')
+      return
+    }
+    createPullSecret.mutateAsync()
+  }
+
   const createPullSecret = useMutation({
     mutationFn: async () => {
+      const namespace = pullSecretNamespace.trim()
+      const body = {
+        name: pullSecretName,
+        idempotency_key: newIdempotencyKey(),
+        ...(namespace ? { namespace } : {}),
+      }
+
+      if (pullSecretMode === 'kubernetes-apply') {
+        const { data, error } = await coreApi.POST('/registry/projects/{project}/pull-secret/kubernetes-apply', {
+          params: { path: { project: project! } },
+          body: { ...body, namespace },
+        })
+        if (error) throw error
+        return data
+      }
+
       const { error } = await coreApi.POST('/registry/projects/{project}/pull-secret', {
         params: { path: { project: project! } },
-        body: {
-          name: pullSecretName,
-          namespace: pullSecretNamespace.trim() || undefined,
-          idempotency_key: newIdempotencyKey(),
-        },
+        body,
       })
       if (error) throw error
+      return undefined
     },
-    onSuccess: () => setPullSecretVisible(false),
+    onSuccess: (data) => {
+      setPullSecretVisible(false)
+      resetPullSecretForm()
+      if (data) setPullSecretApplyResult(data)
+    },
     onError: (e) => showApiError(e),
   })
 
@@ -253,7 +299,7 @@ function RegistryPage() {
               <Button type="outline" onClick={() => setPermVisible(true)}>
                 设置权限
               </Button>
-              <Button type="outline" onClick={() => setPullSecretVisible(true)}>
+              <Button type="outline" onClick={openPullSecretModal}>
                 Pull Secret
               </Button>
             </Space>
@@ -334,18 +380,57 @@ function RegistryPage() {
       <Modal
         visible={pullSecretVisible}
         title="创建 Pull Secret"
-        onCancel={() => setPullSecretVisible(false)}
-        onOk={() => createPullSecret.mutateAsync()}
+        onCancel={() => {
+          setPullSecretVisible(false)
+          resetPullSecretForm()
+        }}
+        onOk={submitPullSecret}
         confirmLoading={createPullSecret.isPending}
       >
         <Form layout="vertical">
+          <Form.Item label="操作模式" required>
+            <Radio.Group value={pullSecretMode} onChange={setPullSecretMode}>
+              <Radio value="create-only">仅创建 Pull Secret</Radio>
+              <Radio value="kubernetes-apply">创建并应用到 Kubernetes Namespace</Radio>
+            </Radio.Group>
+          </Form.Item>
           <Form.Item label="名称" required>
             <Input value={pullSecretName} onChange={setPullSecretName} />
           </Form.Item>
-          <Form.Item label="Namespace">
-            <Input value={pullSecretNamespace} onChange={setPullSecretNamespace} />
+          <Form.Item
+            label="Namespace"
+            required={pullSecretMode === 'kubernetes-apply'}
+            extra={
+              pullSecretMode === 'create-only'
+                ? '仅创建模式下可选，用于记录目标命名空间'
+                : '将 dockerconfigjson Secret 注入该命名空间'
+            }
+          >
+            <Input
+              value={pullSecretNamespace}
+              onChange={setPullSecretNamespace}
+              placeholder={pullSecretMode === 'kubernetes-apply' ? '例如 default' : '可选'}
+            />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        visible={!!pullSecretApplyResult}
+        title="Pull Secret 已应用到 Kubernetes"
+        okText="关闭"
+        hideCancel
+        onOk={() => setPullSecretApplyResult(null)}
+        onCancel={() => setPullSecretApplyResult(null)}
+      >
+        <Descriptions
+          column={1}
+          data={[
+            { label: 'Project', value: pullSecretApplyResult?.project },
+            { label: 'Secret name', value: pullSecretApplyResult?.kubernetes_secret_name ?? pullSecretApplyResult?.name },
+            { label: 'Namespace', value: pullSecretApplyResult?.kubernetes_namespace },
+            { label: 'Secret type', value: K8S_DOCKER_CONFIG_SECRET_TYPE },
+          ]}
+        />
       </Modal>
       <Modal
         visible={createVisible}

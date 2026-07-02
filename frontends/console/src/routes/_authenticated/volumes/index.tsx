@@ -4,10 +4,15 @@ import { Button, Form, Input, InputNumber, Modal } from '@arco-design/web-react'
 import { useState } from 'react'
 import { coreApi } from '@/api/client'
 import { PageHeader } from '@/components/shell/AppShell'
+import { StatusTag } from '@/components/shell/StatusTag'
 import { CursorTable } from '@/components/tables/CursorTable'
 import { newIdempotencyKey } from '@/lib/idempotency'
 import { showApiError } from '@/api/helpers'
 import { listOrThrow } from '@/lib/api-list'
+import { formatDateTime } from '@/lib/format'
+import type { components } from '@/api/core-schema'
+
+type Volume = components['schemas']['StorageVolume']
 
 export const Route = createFileRoute('/_authenticated/volumes/')({
   component: VolumesPage,
@@ -18,7 +23,7 @@ function VolumesPage() {
   const [visible, setVisible] = useState(false)
   const [name, setName] = useState('')
   const [sizeGiB, setSizeGiB] = useState(100)
-  const [storageClass, setStorageClass] = useState('standard')
+  const [storageClass, setStorageClass] = useState('local')
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['volumes'],
@@ -36,7 +41,7 @@ function VolumesPage() {
       setVisible(false)
       setName('')
       setSizeGiB(100)
-      setStorageClass('standard')
+      setStorageClass('local')
       qc.invalidateQueries({ queryKey: ['volumes'] })
     },
     onError: (e) => showApiError(e),
@@ -51,7 +56,7 @@ function VolumesPage() {
     onError: (e) => showApiError(e),
   })
 
-  const items = (data?.items ?? []) as { id: string; name?: string }[]
+  const items = (data?.items ?? []) as Volume[]
 
   return (
     <div className="space-y-4">
@@ -59,7 +64,7 @@ function VolumesPage() {
         title="块存储卷"
         extra={<Button type="primary" onClick={() => setVisible(true)}>创建</Button>}
       />
-      <CursorTable
+      <CursorTable<Volume>
         columns={[
           {
             title: '名称',
@@ -69,6 +74,10 @@ function VolumesPage() {
               </Link>
             ),
           },
+          { title: '容量 (GiB)', dataIndex: 'size_gib' },
+          { title: '存储类', dataIndex: 'storage_class' },
+          { title: '状态', render: (_, r) => <StatusTag status={r.state} /> },
+          { title: '创建时间', render: (_, r) => formatDateTime(r.created_at) },
           {
             title: '操作',
             render: (_, r) => (
@@ -103,7 +112,7 @@ function VolumesPage() {
             <InputNumber value={sizeGiB} min={1} precision={0} onChange={(value) => setSizeGiB(Number(value ?? 1))} />
           </Form.Item>
           <Form.Item label="存储类型">
-            <Input value={storageClass} onChange={setStorageClass} placeholder="standard" />
+            <Input value={storageClass} onChange={setStorageClass} placeholder="local" />
           </Form.Item>
         </Form>
       </Modal>

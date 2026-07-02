@@ -14,7 +14,7 @@ import {
   Spin,
   Tabs,
 } from '@arco-design/web-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { coreApi } from '@/api/client'
 import { PageHeader } from '@/components/shell/AppShell'
 import { StatusTag } from '@/components/shell/StatusTag'
@@ -30,6 +30,17 @@ type VectorStore = components['schemas']['VectorStore']
 type SearchHit = components['schemas']['VectorStoreSearchHit']
 type VectorMetric = components['schemas']['CreateVectorStoreRequest']['metric']
 
+function defaultSearchVector(dimension: number): string {
+  const size = Math.max(1, Math.floor(dimension))
+  return Array.from({ length: size }, (_, index) => ((index + 1) / 10).toFixed(1)).join(',')
+}
+
+function parseSearchVector(raw: string): number[] {
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+  return trimmed.split(',').map((value) => Number.parseFloat(value.trim()))
+}
+
 export const Route = createFileRoute('/_authenticated/vector-stores/')({
   component: VectorStoresPage,
 })
@@ -41,7 +52,7 @@ function VectorStoresPage() {
   const [dimension, setDimension] = useState(128)
   const [metric, setMetric] = useState<VectorMetric>('cosine')
   const [detailId, setDetailId] = useState<string | null>(null)
-  const [searchVector, setSearchVector] = useState('0.1,0.2,0.3')
+  const [searchVector, setSearchVector] = useState('')
   const [topK, setTopK] = useState(10)
   const [filterJson, setFilterJson] = useState('{}')
   const [documentsJson, setDocumentsJson] = useState('[\n  {\n    "content": "",\n    "metadata": {},\n    "id": ""\n  }\n]')
@@ -96,7 +107,14 @@ function VectorStoresPage() {
 
   const search = useMutation({
     mutationFn: async () => {
-      const vector = searchVector.split(',').map((v) => parseFloat(v.trim()))
+      const dimension = detail.data?.dimension
+      const vector = parseSearchVector(searchVector)
+      if (vector.some((value) => Number.isNaN(value))) {
+        throw new Error('向量必须为逗号分隔的数字')
+      }
+      if (dimension != null && vector.length !== dimension) {
+        throw new Error(`向量维度必须为 ${dimension}，当前为 ${vector.length}`)
+      }
       const parsedFilter = filterJson.trim() ? JSON.parse(filterJson) : undefined
       const { data, error } = await coreApi.POST('/vector-stores/{vector_store_id}/search', {
         params: { path: { vector_store_id: detailId! } },
@@ -132,6 +150,13 @@ function VectorStoresPage() {
   const items = (list.data?.items ?? []) as VectorStore[]
   const searchHits = (search.data?.items ?? []) as SearchHit[]
   const detailRecord = detail.data
+
+  useEffect(() => {
+    if (!detailRecord?.dimension) return
+    setSearchVector(defaultSearchVector(detailRecord.dimension))
+    search.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset search state when switching stores
+  }, [detailRecord?.id, detailRecord?.dimension])
 
   const confirmDelete = (row: VectorStore) => {
     Modal.confirm({
@@ -189,6 +214,7 @@ function VectorStoresPage() {
         onCancel={() => {
           setDetailId(null)
           search.reset()
+          setSearchVector('')
           setTopK(10)
           setFilterJson('{}')
           setDocumentsJson('[\n  {\n    "content": "",\n    "metadata": {},\n    "id": ""\n  }\n]')
@@ -220,7 +246,11 @@ function VectorStoresPage() {
                     <Input
                       value={searchVector}
                       onChange={setSearchVector}
-                      placeholder="向量（逗号分隔）"
+                      placeholder={
+                        detailRecord?.dimension
+                          ? `向量（逗号分隔，需 ${detailRecord.dimension} 维）`
+                          : '向量（逗号分隔）'
+                      }
                       className="min-w-[240px] flex-1"
                     />
                     <InputNumber

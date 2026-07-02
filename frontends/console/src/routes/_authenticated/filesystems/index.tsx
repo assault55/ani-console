@@ -4,10 +4,15 @@ import { Button, Form, Input, InputNumber, Modal, Select, Space } from '@arco-de
 import { useState } from 'react'
 import { coreApi } from '@/api/client'
 import { PageHeader } from '@/components/shell/AppShell'
+import { StatusTag } from '@/components/shell/StatusTag'
 import { CursorTable } from '@/components/tables/CursorTable'
 import { newIdempotencyKey } from '@/lib/idempotency'
 import { showApiError } from '@/api/helpers'
 import { listOrThrow } from '@/lib/api-list'
+import { formatDateTime } from '@/lib/format'
+import type { components } from '@/api/core-schema'
+
+type Filesystem = components['schemas']['StorageFilesystem']
 
 export const Route = createFileRoute('/_authenticated/filesystems/')({
   component: FilesystemsPage,
@@ -53,12 +58,12 @@ function FilesystemsPage() {
     onError: (e) => showApiError(e),
   })
 
-  const items = (data?.items ?? []) as { id: string; name?: string }[]
+  const items = (data?.items ?? []) as Filesystem[]
 
   return (
     <div className="space-y-4">
       <PageHeader title="文件存储" extra={<Button type="primary" onClick={() => setVisible(true)}>创建</Button>} />
-      <CursorTable
+      <CursorTable<Filesystem>
         columns={[
           {
             title: '名称',
@@ -68,6 +73,11 @@ function FilesystemsPage() {
               </Link>
             ),
           },
+          { title: '协议', dataIndex: 'protocol' },
+          { title: '容量 (GiB)', dataIndex: 'size_gib' },
+          { title: '挂载端点', render: (_, r) => r.endpoint ?? '—' },
+          { title: '状态', render: (_, r) => <StatusTag status={r.state} /> },
+          { title: '创建时间', render: (_, r) => formatDateTime(r.created_at) },
           {
             title: '操作',
             render: (_, r) => (
