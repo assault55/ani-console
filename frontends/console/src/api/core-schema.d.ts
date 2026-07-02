@@ -668,7 +668,7 @@ export interface paths {
         put?: never;
         /**
          * 申请对象上传预签名 URL
-         * @description 返回预签名上传 URL，客户端直接 PUT 文件到该 URL；不经过 Gateway 传输文件内容。
+         * @description 返回预签名上传 URL，客户端直接 PUT 文件到该 URL；不经过 Gateway 传输文件内容。Gateway 会同步写入对象元数据（state=pending）；客户端 PUT 成功后须调用 POST /objects/{object_id}/complete 对齐 S3 实际 size/content-type。
          */
         post: operations["uploadStorageObject"];
         delete?: never;
@@ -690,6 +690,26 @@ export interface paths {
         post?: never;
         /** 删除对象元数据 */
         delete: operations["deleteStorageObject"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/objects/{object_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 确认对象上传完成并对齐对象存储元数据
+         * @description 客户端 PUT 预签名 URL 成功后调用；Gateway 通过 StatObject 读取 S3/MinIO 实际 size/content-type 并回写 storage_objects 元数据（state=available）。
+         */
+        post: operations["completeStorageObjectUpload"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -883,6 +903,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registry/projects/{project}/pull-secret/kubernetes-apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 创建 Harbor pull secret 并注入 Kubernetes imagePullSecret
+         * @description 创建项目级 Harbor robot pull secret，并通过 SecretProviderApply 将 dockerconfigjson Secret 注入目标 namespace；不在 API 响应中返回 robot 密码明文。
+         */
+        post: operations["applyRegistryProjectPullSecretToKubernetes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registry/projects/{project}/scan-report": {
         parameters: {
             query?: never;
@@ -925,40 +965,30 @@ export interface paths {
             cookie?: never;
         };
         /** 获取平台品牌配置 */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description 品牌配置 */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            platform_name?: string;
-                            /** Format: uri */
-                            logo_light_url?: string;
-                            /** Format: uri */
-                            logo_dark_url?: string;
-                            /** Format: uri */
-                            favicon_url?: string;
-                            /** @example #1677FF */
-                            primary_color?: string;
-                            secondary_color?: string;
-                            icp_number?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
+        get: operations["getBranding"];
+        /** 更新平台品牌配置 */
+        put: operations["updateBranding"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/branding/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 上传平台 Logo
+         * @description multipart/form-data；字段 `variant`（light/dark/favicon）与 `file`（图片）。对象写入 branding bucket 后更新 `platform_branding` 对应 URL。
+         */
+        post: operations["uploadBrandingLogo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1871,6 +1901,46 @@ export interface components {
             real_provider: boolean;
             reason?: string | null;
         };
+        PlatformBranding: {
+            platform_name?: string;
+            /** Format: uri */
+            logo_light_url?: string;
+            /** Format: uri */
+            logo_dark_url?: string;
+            /** Format: uri */
+            favicon_url?: string;
+            /** @example #1677FF */
+            primary_color?: string;
+            secondary_color?: string;
+            icp_number?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        BrandingUpdateRequest: {
+            platform_name?: string;
+            /** Format: uri */
+            logo_light_url?: string;
+            /** Format: uri */
+            logo_dark_url?: string;
+            /** Format: uri */
+            favicon_url?: string;
+            primary_color?: string;
+            secondary_color?: string;
+            icp_number?: string;
+        };
+        BrandingLogoUploadResponse: {
+            platform_name?: string;
+            /** Format: uri */
+            logo_light_url?: string;
+            /** Format: uri */
+            logo_dark_url?: string;
+            /** Format: uri */
+            favicon_url?: string;
+            /** @enum {string} */
+            variant?: "light" | "dark" | "favicon";
+            /** Format: uri */
+            object_url?: string;
+        };
         /** @description ANI Core 计算实例（VM/Container/GPU/Sandbox/BM/K8s集群/Batch） */
         InstanceRecord: {
             id: string;
@@ -2658,6 +2728,14 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        RegistryPullSecretKubernetesApply: components["schemas"]["RegistryPullSecret"] & {
+            kubernetes_secret_name: string;
+            kubernetes_namespace: string;
+            kubernetes_applied: boolean;
+            provider_refs?: string[];
+            /** Format: date-time */
+            applied_at: string;
+        };
         RegistryProjectScanReport: {
             project: string;
             /** @enum {string} */
@@ -3091,6 +3169,15 @@ export interface components {
         };
         /** @description 资源已存在或冲突（code=CONFLICT） */
         Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description 能力未配置或不可用（code=NOT_IMPLEMENTED） */
+        NotImplemented: {
             headers: {
                 [name: string]: unknown;
             };
@@ -4604,6 +4691,32 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    completeStorageObjectUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                object_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已对齐的对象元数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageObject"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["PreconditionFailed"];
+        };
+    };
     downloadStorageObject: {
         parameters: {
             query?: {
@@ -4963,6 +5076,37 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    applyRegistryProjectPullSecretToKubernetes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRegistryPullSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description Pull secret 已创建并注入 Kubernetes */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryPullSecretKubernetesApply"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            501: components["responses"]["NotImplemented"];
+        };
+    };
     getRegistryProjectScanReport: {
         parameters: {
             query?: never;
@@ -5011,6 +5155,97 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 品牌配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformBranding"];
+                };
+            };
+        };
+    };
+    updateBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandingUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新后的品牌配置 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformBranding"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    uploadBrandingLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * @default light
+                     * @enum {string}
+                     */
+                    variant?: "light" | "dark" | "favicon";
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 上传成功并返回更新后的 URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingLogoUploadResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description 依赖不可用（code=SERVICE_UNAVAILABLE） */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     listInstanceOperations: {
