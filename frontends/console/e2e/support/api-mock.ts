@@ -94,12 +94,24 @@ const MOCK_ROUTES: MockRoute[] = [
   {
     method: 'GET',
     pattern: /^\/volumes$/,
-    body: { items: [{ id: 'vol-1', name: 'data-vol', size_gib: 100, storage_class: 'default' }] },
+    body: {
+      items: [
+        {
+          id: 'vol-1',
+          name: 'data-vol',
+          size_gib: 100,
+          storage_class: 'default',
+          state: 'available',
+          created_at: ISO,
+          updated_at: ISO,
+        },
+      ],
+    },
   },
   {
     method: 'GET',
     pattern: /^\/volumes\/[^/]+$/,
-    body: { id: 'vol-1', name: 'data-vol', size_gib: 100, storage_class: 'default' },
+    body: { id: 'vol-1', name: 'data-vol', size_gib: 100, storage_class: 'default', state: 'available', created_at: ISO, updated_at: ISO },
   },
   {
     method: 'GET',
@@ -109,12 +121,34 @@ const MOCK_ROUTES: MockRoute[] = [
   {
     method: 'GET',
     pattern: /^\/filesystems$/,
-    body: { items: [{ id: 'fs-1', name: 'shared-fs', protocol: 'nfs', size_gib: 200 }] },
+    body: {
+      items: [
+        {
+          id: 'fs-1',
+          name: 'shared-fs',
+          protocol: 'nfs',
+          size_gib: 200,
+          endpoint: 'nfs.example.local:/export/shared-fs',
+          state: 'available',
+          created_at: ISO,
+          updated_at: ISO,
+        },
+      ],
+    },
   },
   {
     method: 'GET',
     pattern: /^\/filesystems\/[^/]+$/,
-    body: { id: 'fs-1', name: 'shared-fs', protocol: 'nfs', size_gib: 200 },
+    body: {
+      id: 'fs-1',
+      name: 'shared-fs',
+      protocol: 'nfs',
+      size_gib: 200,
+      endpoint: 'nfs.example.local:/export/shared-fs',
+      state: 'available',
+      created_at: ISO,
+      updated_at: ISO,
+    },
   },
   {
     method: 'GET',
@@ -124,12 +158,58 @@ const MOCK_ROUTES: MockRoute[] = [
   {
     method: 'GET',
     pattern: /^\/buckets$/,
-    body: { items: [{ id: 'bucket-1', name: 'e2e-bucket' }] },
+    body: {
+      items: [
+        {
+          id: 'bucket-1',
+          name: 'e2e-bucket',
+          access_mode: 'private',
+          object_count: 1,
+          created_at: ISO,
+        },
+      ],
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/objects\/[^/]+$/,
+    body: (match) => {
+      const objectId = match[0].slice('/objects/'.length)
+      return {
+        id: objectId,
+        tenant_id: 'tenant-1',
+        bucket: 'e2e-bucket',
+        key: 'readme.txt',
+        size_bytes: 1024,
+        content_type: 'text/plain',
+        state: 'available',
+        created_at: ISO,
+        updated_at: ISO,
+      }
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/objects\/[^/]+\/download$/,
+    body: { download_url: 'https://example.com/e2e-download', expires_at: ISO },
   },
   {
     method: 'GET',
     pattern: /^\/objects$/,
-    body: { items: [{ id: 'obj-1', key: 'readme.txt', size_bytes: 1024 }] },
+    body: {
+      items: [
+        {
+          id: 'obj-1',
+          bucket: 'e2e-bucket',
+          key: 'readme.txt',
+          size_bytes: 1024,
+          content_type: 'text/plain',
+          state: 'available',
+          created_at: ISO,
+          updated_at: ISO,
+        },
+      ],
+    },
   },
   {
     method: 'GET',
@@ -336,6 +416,23 @@ const MOCK_ROUTES: MockRoute[] = [
       low: 3,
       artifacts_total: 1,
       scanned_artifacts: 1,
+    },
+  },
+  {
+    method: 'POST',
+    pattern: /^\/registry\/projects\/[^/]+\/pull-secret\/kubernetes-apply$/,
+    body: {
+      project: 'ani',
+      name: 'ani-registry-pull',
+      secret_ref: 'secret/registry/ani-registry-pull',
+      registry: 'registry.e2e.local',
+      username: 'robot$ani',
+      namespace: 'e2e-ns',
+      created_at: ISO,
+      kubernetes_secret_name: 'ani-registry-pull',
+      kubernetes_namespace: 'e2e-ns',
+      kubernetes_applied: true,
+      applied_at: ISO,
     },
   },
 ]

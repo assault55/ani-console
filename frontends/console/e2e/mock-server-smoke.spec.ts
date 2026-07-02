@@ -109,7 +109,9 @@ test.describe('Mock Server 联调 smoke', () => {
   test('对象存储可加载桶和对象列表', async ({ page }) => {
     await page.goto('/objects')
     await expect(page.getByRole('heading', { name: '对象存储' })).toBeVisible()
-    await page.getByRole('button', { name: 'mock-bucket' }).click()
+    await page.getByRole('link', { name: 'mock-bucket' }).click()
+    await expect(page).toHaveURL(/\/objects\//)
+    await expect(page.getByRole('heading', { name: 'mock-bucket' })).toBeVisible()
     await expect(page.getByText('mock.txt')).toBeVisible()
   })
 })
