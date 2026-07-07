@@ -5,7 +5,9 @@ export function matchSideMenuKey(pathname: string, routeKeys: string[]): string[
   const prefix = routeKeys
     .filter((k) => k !== '/' && pathname.startsWith(k))
     .sort((a, b) => b.length - a.length)[0]
-  return prefix ? [prefix] : ['/']
+  if (prefix) return [prefix]
+  const submenu = openSubMenuKeysForPath(pathname)[0]
+  return submenu ? [submenu] : ['/']
 }
 
 const PATH_SUBMENU: { prefix: string; key: string }[] = [
@@ -16,11 +18,11 @@ const PATH_SUBMENU: { prefix: string; key: string }[] = [
   { prefix: '/instances/sandbox', key: 'compute' },
   { prefix: '/gpu-inventory', key: 'compute' },
   { prefix: '/sandbox-templates', key: 'compute' },
-  { prefix: '/volumes', key: 'storage-network' },
-  { prefix: '/filesystems', key: 'storage-network' },
-  { prefix: '/objects', key: 'storage-network' },
-  { prefix: '/vector-stores', key: 'storage-network' },
-  { prefix: '/networks', key: 'storage-network' },
+  { prefix: '/volumes', key: 'storage' },
+  { prefix: '/filesystems', key: 'storage' },
+  { prefix: '/objects', key: 'storage' },
+  { prefix: '/vector-stores', key: 'storage' },
+  { prefix: '/networks', key: 'network-management' },
   { prefix: '/encryption', key: 'security' },
   { prefix: '/secrets', key: 'security' },
   { prefix: '/settings', key: 'settings' },

@@ -2,9 +2,9 @@ import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from './core-schema'
 import { useAuthStore } from '@/stores/auth'
 
-const API_BASE = '/api/v1'
+export const CORE_API_BASE = '/api/v1'
 
-export const coreApi = createClient<paths>({ baseUrl: API_BASE, credentials: 'include' })
+export const coreApi = createClient<paths>({ baseUrl: CORE_API_BASE, credentials: 'include' })
 
 function isPublicAuthRequest(request: Request): boolean {
   const path = new URL(request.url).pathname

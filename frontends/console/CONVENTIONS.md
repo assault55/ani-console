@@ -113,7 +113,7 @@ cd frontends/console && npm run verify
 
 **禁止**：仅 `npm run build`、仅手点页面、或只跑 E2E 不跑单元测试就标记完成。
 
-**新会话继续开发前必须先读** [`docs/CONSOLE-TASK-PLAN.md`](./docs/CONSOLE-TASK-PLAN.md)、`docs/CONSOLE-SPRINT-PHASES.md` 与最新 sprint 文件。
+**新会话继续开发前必须先读** [`docs/CONSOLE-TASK-PLAN.md`](./docs/CONSOLE-TASK-PLAN.md)、`docs/CONSOLE-SPRINT-PHASES.md`、当前模块 `../../docs/console-module/**` PRD/UX/详文与最新 sprint 文件。
 
 ---
 

@@ -454,7 +454,8 @@ export interface paths {
         delete: operations["deleteNetworkSecurityGroup"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** 更新安全组规则 */
+        patch: operations["updateNetworkSecurityGroup"];
         trace?: never;
     };
     "/networks/load-balancers": {
@@ -506,6 +507,24 @@ export interface paths {
         /** 创建路由条目 */
         post: operations["createNetworkRoute"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/networks/routes/{route_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询路由条目 */
+        get: operations["getNetworkRoute"];
+        put?: never;
+        post?: never;
+        /** 删除路由条目 */
+        delete: operations["deleteNetworkRoute"];
         options?: never;
         head?: never;
         patch?: never;
@@ -820,7 +839,7 @@ export interface paths {
         put?: never;
         /**
          * 创建或确保镜像仓库项目
-         * @description 创建租户镜像仓库项目；客户端重试必须复用同一个 idempotency_key。
+         * @description 创建租户镜像仓库项目；同一租户可创建多个项目，name 为租户内唯一标识；客户端重试必须复用同一个 idempotency_key。
          */
         post: operations["createRegistryProject"];
         delete?: never;
@@ -1962,6 +1981,12 @@ export interface components {
             /** @example kubernetes_rest */
             provider: string;
             dev_profile?: components["schemas"]["CoreDevProfileInfo"];
+            /** @description 实例创建时选择的 ANI VPC ID；未指定网络时为空。 */
+            vpc_id?: string | null;
+            /** @description 实例创建时选择的 ANI Subnet ID；后端负责翻译为 provider 子网资源。 */
+            subnet_id?: string | null;
+            /** @description 实例创建时请求的私有 IPv4；未指定时由 provider 分配。 */
+            private_ip?: string | null;
             audit_id?: string | null;
             resource_refs?: string[];
             endpoint?: string | null;
@@ -2123,8 +2148,19 @@ export interface components {
             ssh_username: string | null;
             /** @description VM SSH key/secret 引用；不包含私钥内容 */
             ssh_key_ref?: string | null;
+            /** @description 容器入口命令；可选，不传时使用镜像默认入口。 */
+            command?: string[] | null;
+            /** @description 容器入口参数；可选，不传时使用镜像默认参数。 */
+            args?: string[] | null;
             /** @default false */
             termination_protection: boolean;
+            /** @description 实例网络选择；客户端只提交 ANI VPC/Subnet ID，不能提交 provider annotation。未传时走当前默认网络逻辑。 */
+            network?: {
+                vpc_id?: string | null;
+                subnet_id?: string | null;
+                /** @description 可选 IPv4，必须位于 subnet.cidr 内且不能等于 gateway。 */
+                private_ip?: string | null;
+            } | null;
             gpu?: {
                 /** @example nvidia */
                 vendor?: string;
@@ -2464,6 +2500,12 @@ export interface components {
             description?: string | null;
             rules?: components["schemas"]["NetworkSecurityGroupRule"][];
         };
+        UpdateNetworkSecurityGroupRequest: {
+            /** @description 客户端生成；同一 tenant_id 下 24 小时内去重 */
+            idempotency_key: string;
+            description?: string | null;
+            rules: components["schemas"]["NetworkSecurityGroupRule"][];
+        };
         CreateNetworkLoadBalancerRequest: {
             /** @description 客户端生成；同一 tenant_id 下 24 小时内去重 */
             idempotency_key: string;
@@ -2640,6 +2682,7 @@ export interface components {
         };
         CreateRegistryProjectRequest: {
             idempotency_key: string;
+            /** @description 租户内唯一的 ANI 镜像仓库项目名；可自定义，不要求等于 tenant_id。 */
             name: string;
             /** @default false */
             public: boolean;
@@ -3619,6 +3662,12 @@ export interface operations {
                 limit?: number;
                 cursor?: string;
                 level?: "debug" | "info" | "warn" | "error";
+                /** @description false 返回一次性 text/plain 日志文本；true 返回 text/event-stream 实时日志流。 */
+                follow?: boolean;
+                /** @description follow=true 时订阅前返回的历史尾部行数。 */
+                tail_lines?: number;
+                /** @description follow=true 时订阅指定容器日志。 */
+                container?: string;
             };
             header?: never;
             path: {
@@ -3628,13 +3677,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 实例日志列表 */
+            /** @description 实例日志。默认返回一次性 text/plain 日志文本；follow=true 时返回 Server-Sent Events log stream。 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InstanceLogListResponse"];
+                    "text/plain": string;
+                    "text/event-stream": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3853,11 +3903,13 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listNetworkSubnets: {
         parameters: {
             query?: {
+                vpc_id?: string;
                 limit?: number;
                 cursor?: string;
             };
@@ -3906,6 +3958,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getNetworkSubnet: {
@@ -3956,6 +4009,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listNetworkSecurityGroups: {
@@ -4058,6 +4112,38 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateNetworkSecurityGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                security_group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNetworkSecurityGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description 安全组已更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkSecurityGroup"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listNetworkLoadBalancers: {
@@ -4111,6 +4197,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getNetworkLoadBalancer: {
@@ -4161,6 +4248,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listNetworkRoutes: {
@@ -4212,6 +4300,57 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getNetworkRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 路由条目 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkRoute"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteNetworkRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 路由条目已删除 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkRoute"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

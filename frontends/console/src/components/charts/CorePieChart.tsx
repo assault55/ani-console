@@ -4,9 +4,8 @@ import * as echarts from 'echarts/core'
 import { PieChart } from 'echarts/charts'
 import { LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { use } from 'echarts/core'
 
-use([PieChart, LegendComponent, TooltipComponent, CanvasRenderer])
+echarts.use([PieChart, LegendComponent, TooltipComponent, CanvasRenderer])
 
 type CorePieChartProps = {
   option: EChartsOption

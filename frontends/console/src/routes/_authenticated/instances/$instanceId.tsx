@@ -23,9 +23,11 @@ import { coreApi } from '@/api/client'
 import { PageHeader } from '@/components/shell/AppShell'
 import { StatusTag } from '@/components/shell/StatusTag'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
+import { InstanceLogsPanel } from '@/components/instances/InstanceLogsPanel'
 import { formatDateTime } from '@/lib/format'
 import { showApiError } from '@/api/helpers'
 import { newIdempotencyKey } from '@/lib/idempotency'
+import { getInstanceDisplayIp, getInstanceNetworkValue } from '@/lib/instance-network'
 import type { components } from '@/api/core-schema'
 
 export const Route = createFileRoute('/_authenticated/instances/$instanceId')({
@@ -65,6 +67,10 @@ function TabQueryBody<T>({
 
 function InstanceDetailPage() {
   const { instanceId } = Route.useParams()
+  return <InstanceDetailContent instanceId={instanceId} returnTo="/instances" />
+}
+
+export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: string; returnTo: string }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [consoleVisible, setConsoleVisible] = useState(false)
@@ -77,6 +83,7 @@ function InstanceDetailPage() {
   const [execRows, setExecRows] = useState(24)
   const [execCols, setExecCols] = useState(80)
   const [consoleUnavailableReason, setConsoleUnavailableReason] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const detail = useQuery({
     queryKey: ['instance', instanceId],
@@ -89,18 +96,6 @@ function InstanceDetailPage() {
     },
     refetchInterval: INSTANCE_DETAIL_POLL_MS,
     refetchIntervalInBackground: false,
-  })
-
-  const logs = useQuery({
-    queryKey: ['instance', instanceId, 'logs'],
-    queryFn: async () => {
-      const { data, error } = await coreApi.GET('/instances/{instance_id}/logs', {
-        params: { path: { instance_id: instanceId }, query: { limit: 50 } },
-      })
-      if (error) throw error
-      return data
-    },
-    enabled: false,
   })
 
   const events = useQuery({
@@ -146,8 +141,17 @@ function InstanceDetailPage() {
         body: { action, idempotency_key: newIdempotencyKey() },
       })
       if (error) throw error
+      return action
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['instance', instanceId] }),
+    onSuccess: (action) => {
+      if (action === 'delete') {
+        Message.success('实例已删除')
+        qc.invalidateQueries({ queryKey: ['instances'] })
+        navigate({ to: returnTo })
+        return
+      }
+      qc.invalidateQueries({ queryKey: ['instance', instanceId] })
+    },
     onError: (e) => showApiError(e),
   })
 
@@ -220,6 +224,7 @@ function InstanceDetailPage() {
   if (detail.error) return <ApiErrorAlert error={detail.error} />
 
   const inst = detail.data
+  const isVmInstance = inst?.kind === 'vm'
 
   return (
     <div className="space-y-5">
@@ -228,14 +233,16 @@ function InstanceDetailPage() {
         subtitle={`实例详情 · ${inst?.kind ?? ''}`}
         extra={
           <Space wrap>
-            <Button
-              type="primary"
-              loading={openConsole.isPending}
-              disabled={Boolean(consoleUnavailableReason)}
-              onClick={() => setConsoleVisible(true)}
-            >
-              {consoleUnavailableReason ? '控制台（不可用）' : '控制台'}
-            </Button>
+            {isVmInstance ? (
+              <Button
+                type="primary"
+                loading={openConsole.isPending}
+                disabled={Boolean(consoleUnavailableReason)}
+                onClick={() => setConsoleVisible(true)}
+              >
+                {consoleUnavailableReason ? '控制台（不可用）' : '控制台'}
+              </Button>
+            ) : null}
             <Button type="outline" loading={openExec.isPending} onClick={() => setExecVisible(true)}>
               终端
             </Button>
@@ -248,13 +255,13 @@ function InstanceDetailPage() {
             <Button type="outline" status="danger" onClick={confirmDelete}>
               删除
             </Button>
-            <Button type="text" onClick={() => navigate({ to: '/instances' })}>
+            <Button type="text" onClick={() => navigate({ to: returnTo })}>
               返回列表
             </Button>
           </Space>
         }
       />
-      {consoleUnavailableReason ? (
+      {isVmInstance && consoleUnavailableReason ? (
         <Card>
           <div className="text-[var(--color-text-2)]">{consoleUnavailableReason}</div>
         </Card>
@@ -272,8 +279,9 @@ function InstanceDetailPage() {
         />
       </Card>
       <Tabs
+        activeTab={activeTab}
         onChange={(key) => {
-          if (key === 'logs') logs.refetch()
+          setActiveTab(key)
           if (key === 'events') events.refetch()
           if (key === 'metrics') metrics.refetch()
           if (key === 'security') security.refetch()
@@ -284,22 +292,16 @@ function InstanceDetailPage() {
             column={1}
             data={[
               { label: '节点', value: inst?.node_name ?? '—' },
+              { label: 'VPC', value: getInstanceNetworkValue(inst, 'vpc_id') },
+              { label: '子网', value: getInstanceNetworkValue(inst, 'subnet_id') },
+              { label: '内网 IP', value: getInstanceDisplayIp(inst) },
               { label: '终止保护', value: inst?.termination_protection ? '已开启' : '未开启' },
               { label: '状态说明', value: inst?.state_message ?? '—' },
             ]}
           />
         </Tabs.TabPane>
         <Tabs.TabPane key="logs" title="日志">
-          <TabQueryBody query={logs} emptyDescription="暂无日志">
-            {(data) => {
-              const items = (data as { items?: Record<string, unknown>[] })?.items ?? []
-              return items.length === 0 ? (
-                <Empty description="暂无日志" />
-              ) : (
-                <Table data={items} rowKey="id" pagination={false} />
-              )
-            }}
-          </TabQueryBody>
+          <InstanceLogsPanel instanceId={instanceId} active={activeTab === 'logs'} />
         </Tabs.TabPane>
         <Tabs.TabPane key="events" title="事件">
           <TabQueryBody query={events} emptyDescription="暂无事件">
@@ -340,24 +342,26 @@ function InstanceDetailPage() {
           </Link>
         </Tabs.TabPane>
       </Tabs>
-      <Modal
-        visible={consoleVisible}
-        title="打开控制台"
-        onCancel={() => setConsoleVisible(false)}
-        onOk={() => openConsole.mutateAsync()}
-        confirmLoading={openConsole.isPending}
-      >
-        <Form layout="vertical">
-          <Form.Item label="协议" required>
-            <Select value={consoleProtocol} onChange={setConsoleProtocol}>
-              <Select.Option value="console">console</Select.Option>
-              <Select.Option value="vnc">vnc</Select.Option>
-              <Select.Option value="novnc">novnc</Select.Option>
-              <Select.Option value="serial">serial</Select.Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {isVmInstance ? (
+        <Modal
+          visible={consoleVisible}
+          title="打开控制台"
+          onCancel={() => setConsoleVisible(false)}
+          onOk={() => openConsole.mutateAsync()}
+          confirmLoading={openConsole.isPending}
+        >
+          <Form layout="vertical">
+            <Form.Item label="协议" required>
+              <Select value={consoleProtocol} onChange={setConsoleProtocol}>
+                <Select.Option value="console">console</Select.Option>
+                <Select.Option value="vnc">vnc</Select.Option>
+                <Select.Option value="novnc">novnc</Select.Option>
+                <Select.Option value="serial">serial</Select.Option>
+              </Select>
+            </Form.Item>
+          </Form>
+        </Modal>
+      ) : null}
       <Modal
         visible={execVisible}
         title="打开终端"

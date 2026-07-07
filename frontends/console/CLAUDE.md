@@ -21,9 +21,10 @@
 2. UI规范-2.0.md
 3. 产品设计规范-*-2.0.md（设计原则 → Arco → 页面模板 → 样式边界 → 评审清单）
 4. docs/CONSOLE-SPEC-COMPLIANCE-BATCHES.md（当前 SCB 批次）
-5. docs/CONSOLE-TASK-PLAN.md
-6. CONVENTIONS.md
-7. 本批次 SPRINT-SCB-*.md 或 SPRINT-P*.md
+5. ../../docs/console-module/**（当前模块 PRD / UX / 详文；网络模块见 ../../docs/console-module/network-management-docs）
+6. docs/CONSOLE-TASK-PLAN.md
+7. CONVENTIONS.md
+8. 本批次 SPRINT-SCB-*.md 或 SPRINT-P*.md
 ```
 
 ---

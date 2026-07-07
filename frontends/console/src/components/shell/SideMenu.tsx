@@ -32,14 +32,21 @@ const menuItems = [
   },
   { key: '/k8s-clusters', label: 'K8s 集群', icon: <IconApps /> },
   {
-    key: 'storage-network',
-    label: '存储与网络',
+    key: 'storage',
+    label: '存储',
     icon: <IconStorage />,
     children: [
       { key: '/volumes', label: '块存储' },
       { key: '/filesystems', label: '文件存储' },
       { key: '/objects', label: '对象存储' },
       { key: '/vector-stores', label: '向量存储' },
+    ],
+  },
+  {
+    key: 'network-management',
+    label: '网络管理',
+    icon: <IconNav />,
+    children: [
       { key: '/networks/vpcs', label: 'VPC' },
       { key: '/networks/subnets', label: '子网' },
       { key: '/networks/security-groups', label: '安全组' },

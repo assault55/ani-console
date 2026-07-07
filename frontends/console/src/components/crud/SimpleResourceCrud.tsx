@@ -18,7 +18,7 @@ export interface SimpleCrudDetailConfig {
 export interface SimpleCrudConfig {
   title: string
   subtitle?: string
-  queryKey: string
+  queryKey: string | readonly unknown[]
   nameField?: string
   list: () => Promise<{ items?: Record<string, unknown>[]; next_cursor?: string | null }>
   onCreate?: (name: string) => Promise<void>
@@ -33,6 +33,8 @@ export interface SimpleCrudConfig {
   showState?: boolean
   detail?: SimpleCrudDetailConfig
   columns?: ColumnProps<Record<string, unknown>>[]
+  extraColumns?: ColumnProps<Record<string, unknown>>[]
+  filters?: React.ReactNode
 }
 
 export function SimpleResourceCrud({
@@ -49,19 +51,22 @@ export function SimpleResourceCrud({
   showState = false,
   detail,
   columns: columnsOverride,
+  extraColumns,
+  filters,
 }: SimpleCrudConfig) {
   const qc = useQueryClient()
   const [visible, setVisible] = useState(false)
   const [name, setName] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
+  const resourceQueryKey = useMemo(() => (Array.isArray(queryKey) ? [...queryKey] : [queryKey]), [queryKey])
 
   const { data, isLoading, error } = useQuery({
-    queryKey: [queryKey],
+    queryKey: resourceQueryKey,
     queryFn: list,
   })
 
   const detailQuery = useQuery({
-    queryKey: [queryKey, 'detail', detailId],
+    queryKey: [...resourceQueryKey, 'detail', detailId],
     queryFn: () => detail!.fetch(detailId!),
     enabled: !!detailId && !!detail,
   })
@@ -79,14 +84,14 @@ export function SimpleResourceCrud({
       setVisible(false)
       setName('')
       createForm?.onReset?.()
-      qc.invalidateQueries({ queryKey: [queryKey] })
+      qc.invalidateQueries({ queryKey: resourceQueryKey })
     },
     onError: (e) => showApiError(e),
   })
 
   const deleteMut = useMutation({
     mutationFn: onDelete ?? (async () => {}),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [queryKey] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: resourceQueryKey }),
     onError: (e) => showApiError(e),
   })
 
@@ -112,6 +117,8 @@ export function SimpleResourceCrud({
         },
       },
     ]
+
+    if (extraColumns) cols.push(...extraColumns)
 
     if (showState) {
       cols.push({
@@ -144,7 +151,7 @@ export function SimpleResourceCrud({
     }
 
     return cols
-  }, [columnsOverride, detail, deleteMut, idKey, nameField, onDelete, showState, title])
+  }, [columnsOverride, detail, deleteMut, extraColumns, idKey, nameField, onDelete, showState, title])
 
   const detailRecord = detailQuery.data
   const detailTitle = detailRecord
@@ -164,6 +171,7 @@ export function SimpleResourceCrud({
           ) : undefined
         }
       />
+      {filters ? <div className="mb-3">{filters}</div> : null}
       <CursorTable<Record<string, unknown>>
         columns={columns}
         data={{ items, next_cursor: data?.next_cursor }}
@@ -194,7 +202,25 @@ export function SimpleResourceCrud({
           width={520}
           visible={!!detailId}
           title={`${title}详情 · ${detailTitle}`}
-          footer={null}
+          footer={
+            onDelete && detailId ? (
+              <Button
+                status="danger"
+                onClick={() =>
+                  Modal.confirm({
+                    title: `删除${title}`,
+                    content: `确定删除「${detailTitle}」？此操作不可恢复。`,
+                    onOk: async () => {
+                      await deleteMut.mutateAsync(detailId)
+                      setDetailId(null)
+                    },
+                  })
+                }
+              >
+                删除{title}
+              </Button>
+            ) : null
+          }
           onCancel={() => setDetailId(null)}
         >
           {detailQuery.isLoading && !detailQuery.data ? (

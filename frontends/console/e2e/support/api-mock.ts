@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 
-type MockBody = Record<string, unknown> | unknown[] | null
+type MockBody = Record<string, unknown> | unknown[] | string | null
 
 interface MockRoute {
   method: string
@@ -16,7 +16,18 @@ const MOCK_ROUTES: MockRoute[] = [
     method: 'GET',
     pattern: /^\/instances$/,
     body: {
-      items: [{ id: 'inst-1', name: 'e2e-vm', state: 'running', created_at: ISO }],
+      items: [
+        {
+          id: 'inst-1',
+          name: 'e2e-vm',
+          state: 'running',
+          kind: 'container',
+          vpc_id: 'vpc-1',
+          subnet_id: 'subnet-1',
+          private_ip: '10.0.1.10',
+          created_at: ISO,
+        },
+      ],
       total: 1,
     },
   },
@@ -28,6 +39,9 @@ const MOCK_ROUTES: MockRoute[] = [
       name: 'e2e-vm',
       state: 'running',
       kind: 'container',
+      vpc_id: 'vpc-1',
+      subnet_id: 'subnet-1',
+      private_ip: '10.0.1.10',
       replicas: 1,
       termination_protection: false,
       created_at: ISO,
@@ -38,6 +52,11 @@ const MOCK_ROUTES: MockRoute[] = [
     method: 'GET',
     pattern: /^\/instances\/[^/]+\/operations$/,
     body: { items: [{ id: 'op-1', operation: 'create', status: 'succeeded' }] },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/instances\/[^/]+\/logs$/,
+    body: `${ISO} info stdout main container ready`,
   },
   {
     method: 'GET',
@@ -58,6 +77,9 @@ const MOCK_ROUTES: MockRoute[] = [
           id: 'key-1',
           name: 'ci-bot',
           key_prefix: 'ani_ci_',
+          scopes: ['scope:instances:read'],
+          rate_limit_rpm: 60,
+          is_active: true,
           created_at: ISO,
         },
       ],
@@ -71,6 +93,9 @@ const MOCK_ROUTES: MockRoute[] = [
       name: 'new-key',
       key_prefix: 'ani_new_',
       key_value: 'ani_sk_e2e_secret',
+      scopes: ['scope:instances:*'],
+      rate_limit_rpm: 60,
+      is_active: true,
       created_at: ISO,
     },
   },
@@ -231,12 +256,48 @@ const MOCK_ROUTES: MockRoute[] = [
   {
     method: 'GET',
     pattern: /^\/networks\/subnets$/,
-    body: { items: [{ id: 'subnet-1', name: 'app-subnet', vpc_id: 'vpc-1', state: 'available', created_at: ISO }] },
+    body: {
+      items: [
+        {
+          id: 'subnet-1',
+          name: 'app-subnet',
+          vpc_id: 'vpc-1',
+          cidr: '10.0.1.0/24',
+          gateway: '10.0.1.1',
+          state: 'available',
+          created_at: ISO,
+        },
+      ],
+    },
   },
   {
     method: 'GET',
     pattern: /^\/networks\/security-groups$/,
-    body: { items: [{ id: 'sg-1', name: 'web-sg', state: 'available', created_at: ISO }] },
+    body: {
+      items: [
+        {
+          id: 'sg-1',
+          name: 'web-sg',
+          description: 'web access',
+          rules: [{ direction: 'ingress', protocol: 'tcp', port_range: '80', cidr: '0.0.0.0/0', action: 'allow' }],
+          state: 'available',
+          created_at: ISO,
+        },
+      ],
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/networks\/security-groups\/[^/]+$/,
+    body: {
+      id: 'sg-1',
+      name: 'web-sg',
+      description: 'web access',
+      rules: [{ direction: 'ingress', protocol: 'tcp', port_range: '80', cidr: '0.0.0.0/0', action: 'allow' }],
+      state: 'available',
+      created_at: ISO,
+      updated_at: ISO,
+    },
   },
   {
     method: 'GET',
@@ -257,6 +318,19 @@ const MOCK_ROUTES: MockRoute[] = [
           created_at: ISO,
         },
       ],
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/networks\/routes\/[^/]+$/,
+    body: {
+      id: 'route-1',
+      vpc_id: 'vpc-1',
+      destination_cidr: '0.0.0.0/0',
+      next_hop_type: 'gateway',
+      next_hop_id: 'igw-1',
+      description: 'default route',
+      created_at: ISO,
     },
   },
   {
@@ -448,6 +522,15 @@ function resolveMock(method: string, apiPath: string): MockBody | undefined {
 }
 
 async function fulfillJson(route: Route, status: number, body: MockBody) {
+  if (typeof body === 'string') {
+    await route.fulfill({
+      status,
+      contentType: 'text/plain',
+      body,
+    })
+    return
+  }
+
   await route.fulfill({
     status,
     contentType: 'application/json',

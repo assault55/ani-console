@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Form, Input, Select } from '@arco-design/web-react'
+import { useQuery } from '@tanstack/react-query'
+import { Button, Form, Input, InputNumber, Select, Space } from '@arco-design/web-react'
 import { useState } from 'react'
 import { networkListenersTable, SimpleResourceCrud } from '@/components/crud/SimpleResourceCrud'
 import { StatusTag } from '@/components/shell/StatusTag'
@@ -15,20 +16,20 @@ export const Route = createFileRoute('/_authenticated/networks/load-balancers/')
   component: LoadBalancersPage,
 })
 
-function parseListenersJson(value: string): LoadBalancerListener[] | undefined {
-  const trimmed = value.trim()
-  if (!trimmed) return undefined
-  const parsed = JSON.parse(trimmed) as unknown
-  if (!Array.isArray(parsed)) throw new Error('监听器必须是 JSON 数组')
-  return parsed as LoadBalancerListener[]
-}
-
 function LoadBalancersPage() {
   const [name, setName] = useState('')
   const [vpcId, setVpcId] = useState('')
   const [subnetId, setSubnetId] = useState('')
   const [scheme, setScheme] = useState<'internal' | 'public'>('internal')
-  const [listenersJson, setListenersJson] = useState('')
+  const [listeners, setListeners] = useState<LoadBalancerListener[]>([])
+  const vpcs = useQuery({
+    queryKey: ['network-vpcs', 'select'],
+    queryFn: () => listOrThrow(() => coreApi.GET('/networks/vpcs', { params: { query: { limit: 50 } } })),
+  })
+  const subnets = useQuery({
+    queryKey: ['network-subnets', 'select'],
+    queryFn: () => listOrThrow(() => coreApi.GET('/networks/subnets', { params: { query: { limit: 50 } } })),
+  })
 
   return (
     <SimpleResourceCrud
@@ -42,13 +43,27 @@ function LoadBalancersPage() {
         content: (
           <Form layout="vertical">
             <Form.Item label="名称" required>
-              <Input value={name} onChange={setName} />
+              <Input aria-label="名称" value={name} onChange={setName} />
             </Form.Item>
-            <Form.Item label="VPC ID" required>
-              <Input value={vpcId} onChange={setVpcId} />
+            <Form.Item label="VPC" required>
+              <Select aria-label="VPC" value={vpcId} onChange={setVpcId} loading={vpcs.isLoading} placeholder="选择 VPC">
+                {(vpcs.data?.items ?? []).map((vpc) => (
+                  <Select.Option key={String(vpc.id)} value={String(vpc.id)}>
+                    {String(vpc.name ?? vpc.id)}
+                  </Select.Option>
+                ))}
+              </Select>
             </Form.Item>
-            <Form.Item label="Subnet ID">
-              <Input value={subnetId} onChange={setSubnetId} />
+            <Form.Item label="子网">
+              <Select value={subnetId} onChange={setSubnetId} loading={subnets.isLoading} allowClear placeholder="可选">
+                {(subnets.data?.items ?? [])
+                  .filter((subnet) => !vpcId || subnet.vpc_id === vpcId)
+                  .map((subnet) => (
+                    <Select.Option key={String(subnet.id)} value={String(subnet.id)}>
+                      {String(subnet.name ?? subnet.id)}
+                    </Select.Option>
+                  ))}
+              </Select>
             </Form.Item>
             <Form.Item label="类型">
               <Select value={scheme} onChange={setScheme}>
@@ -56,13 +71,8 @@ function LoadBalancersPage() {
                 <Select.Option value="public">public</Select.Option>
               </Select>
             </Form.Item>
-            <Form.Item label="监听器 JSON">
-              <Input.TextArea
-                value={listenersJson}
-                onChange={setListenersJson}
-                autoSize={{ minRows: 3, maxRows: 8 }}
-                placeholder='[{"protocol":"tcp","port":80,"target_port":8080}]'
-              />
+            <Form.Item label="监听器">
+              <LoadBalancerListenersFields listeners={listeners} onChange={setListeners} />
             </Form.Item>
           </Form>
         ),
@@ -73,7 +83,7 @@ function LoadBalancersPage() {
               vpc_id: vpcId,
               subnet_id: subnetId || undefined,
               scheme,
-              listeners: parseListenersJson(listenersJson),
+              listeners,
               idempotency_key: newIdempotencyKey(),
             },
           })
@@ -84,7 +94,7 @@ function LoadBalancersPage() {
           setVpcId('')
           setSubnetId('')
           setScheme('internal')
-          setListenersJson('')
+          setListeners([])
         },
       }}
       onDelete={async (id) => {
@@ -114,5 +124,63 @@ function LoadBalancersPage() {
         extraContent: (r) => networkListenersTable(r.listeners as Record<string, unknown>[] | undefined),
       }}
     />
+  )
+}
+
+function LoadBalancerListenersFields({
+  listeners,
+  onChange,
+}: {
+  listeners: LoadBalancerListener[]
+  onChange: (listeners: LoadBalancerListener[]) => void
+}) {
+  const setListener = (index: number, patch: Partial<LoadBalancerListener>) => {
+    onChange(listeners.map((listener, i) => (i === index ? { ...listener, ...patch } : listener)))
+  }
+
+  return (
+    <div className="space-y-3">
+      {listeners.map((listener, index) => (
+        <Space key={index} className="w-full" wrap>
+          <Select
+            aria-label="协议"
+            value={listener.protocol}
+            onChange={(protocol) => setListener(index, { protocol })}
+            style={{ width: 110 }}
+          >
+            <Select.Option value="http">http</Select.Option>
+            <Select.Option value="https">https</Select.Option>
+            <Select.Option value="tcp">tcp</Select.Option>
+          </Select>
+          <InputNumber
+            aria-label="端口"
+            value={listener.port}
+            min={1}
+            max={65535}
+            precision={0}
+            onChange={(port) => setListener(index, { port: Number(port ?? 1) })}
+            style={{ width: 120 }}
+          />
+          <InputNumber
+            aria-label="目标端口"
+            value={listener.target_port}
+            min={1}
+            max={65535}
+            precision={0}
+            onChange={(target_port) => setListener(index, { target_port: Number(target_port ?? 1) })}
+            style={{ width: 120 }}
+          />
+          <Button status="danger" type="text" onClick={() => onChange(listeners.filter((_, i) => i !== index))}>
+            删除
+          </Button>
+        </Space>
+      ))}
+      <Button
+        type="outline"
+        onClick={() => onChange([...listeners, { protocol: 'tcp', port: 80, target_port: 8080 }])}
+      >
+        添加监听器
+      </Button>
+    </div>
   )
 }
