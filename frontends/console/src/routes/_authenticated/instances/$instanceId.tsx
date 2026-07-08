@@ -6,14 +6,11 @@ import {
   Descriptions,
   Empty,
   Form,
-  Input,
-  InputNumber,
   Message,
   Modal,
   Select,
   Space,
   Spin,
-  Switch,
   Tabs,
   Table,
 } from '@arco-design/web-react'
@@ -35,6 +32,15 @@ export const Route = createFileRoute('/_authenticated/instances/$instanceId')({
 })
 
 const INSTANCE_DETAIL_POLL_MS = 3000
+
+function openTerminalWindow(instanceId: string) {
+  const url = `/instances/terminal/${encodeURIComponent(instanceId)}`
+  const width = 1200
+  const height = 800
+  const left = Math.max(0, window.screenX + Math.round((window.outerWidth - width) / 2))
+  const top = Math.max(0, window.screenY + Math.round((window.outerHeight - height) / 2))
+  window.open(url, `Connecting ${instanceId}`, `width=${width},height=${height},left=${left},top=${top},scrollbars=1,resizable=1`)
+}
 
 function getErrorText(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -76,12 +82,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
   const [consoleVisible, setConsoleVisible] = useState(false)
   const [consoleProtocol, setConsoleProtocol] =
     useState<components['schemas']['CreateInstanceConsoleSessionRequest']['protocol']>('novnc')
-  const [execVisible, setExecVisible] = useState(false)
-  const [execContainer, setExecContainer] = useState('')
-  const [execCommand, setExecCommand] = useState('/bin/sh')
-  const [execTty, setExecTty] = useState(true)
-  const [execRows, setExecRows] = useState(24)
-  const [execCols, setExecCols] = useState(80)
   const [consoleUnavailableReason, setConsoleUnavailableReason] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
 
@@ -177,30 +177,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
     },
   })
 
-  const openExec = useMutation({
-    mutationFn: async () => {
-      const command = execCommand
-        .split('\n')
-        .map((part) => part.trim())
-        .filter(Boolean)
-      const { data, error } = await coreApi.POST('/instances/{instance_id}/exec', {
-        params: { path: { instance_id: instanceId } },
-        body: {
-          idempotency_key: newIdempotencyKey(),
-          container: execContainer.trim() || undefined,
-          command: command.length ? command : ['/bin/sh'],
-          tty: execTty,
-          rows: execRows,
-          cols: execCols,
-        },
-      })
-      if (error) throw error
-      if (data?.ws_url) window.open(data.ws_url, '_blank')
-    },
-    onSuccess: () => setExecVisible(false),
-    onError: (e) => showApiError(e),
-  })
-
   const confirmDelete = () => {
     Modal.confirm({
       title: '删除实例',
@@ -243,7 +219,7 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
                 {consoleUnavailableReason ? '控制台（不可用）' : '控制台'}
               </Button>
             ) : null}
-            <Button type="outline" loading={openExec.isPending} onClick={() => setExecVisible(true)}>
+            <Button type="outline" onClick={() => openTerminalWindow(instanceId)}>
               终端
             </Button>
             <Button type="outline" onClick={() => lifecycle.mutateAsync('start')}>
@@ -362,36 +338,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
           </Form>
         </Modal>
       ) : null}
-      <Modal
-        visible={execVisible}
-        title="打开终端"
-        onCancel={() => setExecVisible(false)}
-        onOk={() => openExec.mutateAsync()}
-        confirmLoading={openExec.isPending}
-      >
-        <Form layout="vertical">
-          <Form.Item label="Container">
-            <Input value={execContainer} onChange={setExecContainer} placeholder="可选" />
-          </Form.Item>
-          <Form.Item label="Command" required>
-            <Input.TextArea
-              value={execCommand}
-              onChange={setExecCommand}
-              autoSize={{ minRows: 2, maxRows: 6 }}
-              placeholder="/bin/sh"
-            />
-          </Form.Item>
-          <Form.Item label="TTY">
-            <Switch checked={execTty} onChange={setExecTty} />
-          </Form.Item>
-          <Form.Item label="Rows">
-            <InputNumber value={execRows} min={1} precision={0} onChange={(value) => setExecRows(Number(value ?? 24))} />
-          </Form.Item>
-          <Form.Item label="Cols">
-            <InputNumber value={execCols} min={1} precision={0} onChange={(value) => setExecCols(Number(value ?? 80))} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }

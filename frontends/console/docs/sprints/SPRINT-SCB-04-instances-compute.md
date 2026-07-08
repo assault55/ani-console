@@ -244,3 +244,152 @@ npm run test -- src/lib/instance-network.test.ts
 npm run typecheck
 npx playwright test e2e/instances.spec.ts
 ```
+
+---
+
+## 15. 容器实例创建网络模式与 IP 分配（2026-07-07）
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/index.tsx` | 创建实例表单新增“默认网络 / VPC 网络”选择；默认网络不提交 `network`；VPC 网络需选择 VPC/子网，并支持“自动分配 / 手动指定”固定 IP |
+| `src/routes/_authenticated/instances/index.tsx` | 手动指定 IP 时按所选子网 CIDR 预填并锁定网络段，提交 `network.private_ip`；自动分配时仅提交 `vpc_id/subnet_id` |
+| `e2e/instances.spec.ts` | 覆盖容器创建页默认网络、VPC 自动 IP、VPC 手动 IP 三类请求体，并同步弹窗创建实例的 VPC/固定 IP 流程 |
+
+验收：
+
+```bash
+npm run typecheck
+npx playwright test e2e/instances.spec.ts -g '创建容器实例支持默认网络、VPC 自动 IP 和手动 IP'
+npx playwright test e2e/instances.spec.ts
+```
+
+---
+
+## 16. 容器实例内嵌终端（2026-07-07）
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/$instanceId.tsx` | “终端”从直接 `window.open(ws_url)` 改为页面内弹窗连接；调用 `POST /instances/{id}/exec` 后用 WebSocket 连接 `ws_url`，在页面内展示输出并支持发送输入 |
+| `src/routes/_authenticated/instances/$instanceId.tsx` | 保留 Container、Command、TTY 配置；Rows/Cols 改为固定默认值随请求提交，不再暴露给用户手填 |
+| `e2e/instances.spec.ts` | 覆盖容器实例终端请求体、WebSocket 连接、页面内输出、发送输入，以及不再打开新窗口 |
+
+验收：
+
+```bash
+npm run typecheck
+npx playwright test e2e/instances.spec.ts -g '容器实例终端在页面内连接 exec WebSocket'
+npx playwright test e2e/instances.spec.ts
+```
+
+---
+
+## 17. 容器实例终端 Core exec 契约对齐（2026-07-07）
+
+根目录最新 `v1.yaml` 已同步到 `openapi/v1.yaml` 并重新生成 Console Core schema。本轮按 Core 当前契约收敛容器实例终端：仅创建 exec session 的 POST 使用登录态 Bearer，WebSocket 直接使用 `ws_url` 握手；输入、输出和 resize 均按原始帧/JSON 控制帧处理。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `openapi/v1.yaml`、`src/api/core-schema.d.ts` | 同步 exec session 与 WebSocket 连接契约，补齐 `token`、`expires_at` 和 `/instances/{id}/exec/{session_id}` 说明 |
+| `src/components/instances/InstanceTerminal.tsx` | 初始化 xterm + FitAddon 后读取实际 `rows/cols` 创建 session；请求体发送 `container: null`、`command: ["/bin/sh"]`、`tty: true`；WebSocket 使用 `ws_url` 直连，仅在缺少 token query 时用响应 `token` fallback |
+| `src/components/instances/InstanceTerminal.tsx` | `onData` 原样发送输入；string / ArrayBuffer / Blob 输出直接写入 terminal；xterm/容器 resize 发送 `{ type: "resize", cols, rows }`；卸载/关闭弹窗时释放 listener、关闭 WebSocket、dispose terminal |
+| `e2e/instances.spec.ts` | 覆盖 Bearer 仅用于 POST、`container: null`、`ws_url` 直连、输入原样发送、resize 控制帧、binary/blob 输出解码与关闭弹窗清理 WebSocket |
+
+验收：
+
+```bash
+npm run codegen
+npm run typecheck
+npm run test -- InstanceLogsPanel.test.tsx
+npx playwright test e2e/instances.spec.ts -g "容器实例终端"
+```
+
+---
+
+## 18. 容器实例终端 StrictMode 重复请求修复（2026-07-07）
+
+根因：Console 入口启用 React `StrictMode`，开发态会执行 mount-cleanup-remount；终端组件在 mount effect 内立即创建 exec session，导致点击一次“终端”时 `POST /instances/{id}/exec` 被发出两次。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/components/instances/InstanceTerminal.tsx` | 将 exec session 创建延后一帧启动，并在 effect cleanup 中取消未发出的连接；StrictMode 第一次探测挂载不再触发真实 POST，正常挂载与“重新连接”仍会创建 session |
+| `src/components/instances/InstanceTerminal.test.tsx` | 新增 StrictMode 回归单测，验证组件双挂载探测下只创建一个 exec session |
+
+联调说明：WebSocket 仍按 Core 契约直接连接后端返回的 `ws_url`。若返回 `ws://192.168.102.75:30080/...`，浏览器会绕过 `localhost:5173` 与 Vite `/api` 代理直接访问该地址；连接失败需优先核查该 NodePort/网关地址是否可从浏览器网络访问，以及后端是否按当前访问入口生成了可达的 `ws_url`。
+
+验收：
+
+```bash
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx
+npm run typecheck
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx src/components/instances/InstanceLogsPanel.test.tsx
+npx playwright test e2e/instances.spec.ts -g '容器实例终端在页面内连接 exec WebSocket'
+```
+
+---
+
+## 19. 容器实例终端输入焦点修复（2026-07-07）
+
+现象：exec WebSocket 已连接，但在终端弹窗中输入命令没有反应。前端 stdin 发送依赖 xterm `onData`，而 `onData` 只有在 xterm 输入区域拿到焦点时触发；Modal 打开后焦点可能停留在弹窗按钮或外层元素。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/components/instances/InstanceTerminal.tsx` | WS open 后下一帧聚焦 xterm；终端区域 `mousedown` 时显式调用 `term.focus()`，确保点击终端后键盘输入进入 xterm 并触发 `socket.send(data)` |
+| `src/components/instances/InstanceTerminal.test.tsx` | 新增终端区域点击聚焦回归测试，覆盖 stdin 输入链路的焦点前置条件 |
+
+验收：
+
+```bash
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx
+npm run typecheck
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx src/components/instances/InstanceLogsPanel.test.tsx
+npx playwright test e2e/instances.spec.ts -g '容器实例终端在页面内连接 exec WebSocket'
+```
+
+---
+
+## 20. 容器实例终端 KubeCloud WebSocket 帧协议兼容（2026-07-07）
+
+参照 `/root/kubercon/kubercon-ui` 的 `components/Terminal/terminal.jsx`，实际可用终端后端使用 KubeCloud 风格 JSON 帧：stdin 为 `{ "Op": "stdin", "Data": "..." }`，resize 为 `{ "Op": "resize", "Cols": 120, "Rows": 30 }`，stdout 从响应 JSON 的 `Data` 字段读取。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/components/instances/InstanceTerminal.tsx` | stdin 改为发送 `Op: stdin` 帧；resize 改为发送 `Op: resize` / `Cols` / `Rows` 帧；输出支持 JSON `Data` 解包，同时保留 plain string / ArrayBuffer / Blob 兼容 |
+| `src/components/instances/InstanceTerminal.test.tsx` | 增加 KubeCloud stdin、resize、stdout `Data` 解包单测，保留 StrictMode 单请求与焦点回归覆盖 |
+| `e2e/instances.spec.ts` | WebSocket mock 改为按 `Op: stdin` 回显 `Data`，并覆盖 JSON `Data` 输出渲染 |
+| `docs/superpowers/plans/2026-07-07-instance-terminal-kubecloud-protocol.md` | 记录本次协议兼容实现计划 |
+
+验收：
+
+```bash
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx
+npm run typecheck
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx src/components/instances/InstanceLogsPanel.test.tsx
+npx playwright test e2e/instances.spec.ts -g '容器实例终端在页面内连接 exec WebSocket'
+```
+
+补充修正：现场后端即使返回 Core instance exec URL（如 `/instances/{name}/exec/{session}`），WebSocket 输出仍是 KubeCloud `Op/Data` JSON 帧；前端 stdin / resize 现默认发送 `{ "Op": "stdin", "Data": "..." }` 与 `{ "Op": "resize", "Cols": 120, "Rows": 30 }`，不再按 URL 猜测 raw 协议。
+
+补充修正 2：若 xterm 隐藏输入框未获得焦点，浏览器 WS Frames 中不会出现 outbound stdin。终端容器现已设置 `tabIndex=0`，点击黑色终端区域时同时聚焦容器和 xterm；当 xterm `onData` 未触发且键盘事件落在容器自身时，容器 `keydown` 会将普通字符、Enter、Backspace、Tab、Escape 转为同一套 stdin 帧发送。`InstanceTerminal.test.tsx` 已覆盖输入 `ls + Enter` 时发出 `l`、`s`、`\r`。
+
+---
+
+## 21. 容器实例终端新窗口模式（2026-07-07）
+
+按 `/root/kubercon/kubercon-ui` 的交互方式调整 Console 终端入口：详情页“终端”按钮改为 `window.open` 新页面，不再使用当前页 Modal。连接链路回退到当前可连通的 Core exec session：终端页面先调用 `POST /instances/{id}/exec` 获取 `ws_url`，再连接后端返回的 WebSocket；stdin / resize 默认使用 KubeCloud `Op/Data` JSON 帧。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/$instanceId.tsx` | “终端”按钮改为打开 `/instances/terminal/{instanceId}` 新窗口，窗口尺寸参照 kubercon-ui 的 1200x800 可调整窗口 |
+| `src/routes/instances/terminal/$instanceId.tsx`、`src/routeTree.gen.ts` | 新增根级终端页面，绕过 `_authenticated` 的 `AppShell` 菜单栏；页面仅保留极简标题、关闭按钮和全高终端 |
+| `src/components/instances/InstanceTerminal.tsx` | 回退为 Core exec session 获取 `ws_url`；stdin / resize 默认发送 KubeCloud `Op/Data` 帧；fit 延迟到打开后两帧执行，减少 xterm 初始化期 `dimensions` 异常；键盘 fallback 捕获终端区域和激活窗口的 keydown；终端显示完全等待后端 stdout/stderr 回显，不做前端本地回显 |
+| `src/components/instances/InstanceTerminal.test.tsx` | 覆盖 StrictMode 下只创建一个 Core exec session、默认 KubeCloud 帧、stdout `Data` 解包和键盘 fallback |
+| `e2e/instances.spec.ts` | 覆盖详情页终端按钮打开新窗口，以及终端页面无菜单栏、POST Core exec 后连接返回的 KubeCloud WebSocket 并发送输入 |
+
+验收：
+
+```bash
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx
+npm run typecheck
+npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx src/components/instances/InstanceLogsPanel.test.tsx
+npx playwright test e2e/instances.spec.ts -g '实例列表可进入详情|容器实例终端新页面连接 exec WebSocket'
+```
