@@ -32,6 +32,7 @@ import { Route as AuthenticatedEncryptionIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedBareMetalIndexRouteImport } from './routes/_authenticated/bare-metal/index'
 import { Route as AuthenticatedAuditIndexRouteImport } from './routes/_authenticated/audit/index'
 import { Route as InstancesTerminalInstanceIdRouteImport } from './routes/instances/terminal/$instanceId'
+import { Route as InstancesConsoleInstanceIdRouteImport } from './routes/instances/console/$instanceId'
 import { Route as AuthenticatedVolumesVolumeIdRouteImport } from './routes/_authenticated/volumes/$volumeId'
 import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_authenticated/settings/api-keys'
 import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets/$secretId'
@@ -186,6 +187,12 @@ const InstancesTerminalInstanceIdRoute =
   InstancesTerminalInstanceIdRouteImport.update({
     id: '/instances/terminal/$instanceId',
     path: '/instances/terminal/$instanceId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const InstancesConsoleInstanceIdRoute =
+  InstancesConsoleInstanceIdRouteImport.update({
+    id: '/instances/console/$instanceId',
+    path: '/instances/console/$instanceId',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedVolumesVolumeIdRoute =
@@ -355,6 +362,7 @@ export interface FileRoutesByFullPath {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
+  '/instances/console/$instanceId': typeof InstancesConsoleInstanceIdRoute
   '/instances/terminal/$instanceId': typeof InstancesTerminalInstanceIdRoute
   '/audit/': typeof AuthenticatedAuditIndexRoute
   '/bare-metal/': typeof AuthenticatedBareMetalIndexRoute
@@ -402,6 +410,7 @@ export interface FileRoutesByTo {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
+  '/instances/console/$instanceId': typeof InstancesConsoleInstanceIdRoute
   '/instances/terminal/$instanceId': typeof InstancesTerminalInstanceIdRoute
   '/audit': typeof AuthenticatedAuditIndexRoute
   '/bare-metal': typeof AuthenticatedBareMetalIndexRoute
@@ -453,6 +462,7 @@ export interface FileRoutesById {
   '/_authenticated/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/_authenticated/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/_authenticated/volumes/$volumeId': typeof AuthenticatedVolumesVolumeIdRoute
+  '/instances/console/$instanceId': typeof InstancesConsoleInstanceIdRoute
   '/instances/terminal/$instanceId': typeof InstancesTerminalInstanceIdRoute
   '/_authenticated/audit/': typeof AuthenticatedAuditIndexRoute
   '/_authenticated/bare-metal/': typeof AuthenticatedBareMetalIndexRoute
@@ -504,6 +514,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/settings/api-keys'
     | '/volumes/$volumeId'
+    | '/instances/console/$instanceId'
     | '/instances/terminal/$instanceId'
     | '/audit/'
     | '/bare-metal/'
@@ -551,6 +562,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/settings/api-keys'
     | '/volumes/$volumeId'
+    | '/instances/console/$instanceId'
     | '/instances/terminal/$instanceId'
     | '/audit'
     | '/bare-metal'
@@ -601,6 +613,7 @@ export interface FileRouteTypes {
     | '/_authenticated/secrets/$secretId'
     | '/_authenticated/settings/api-keys'
     | '/_authenticated/volumes/$volumeId'
+    | '/instances/console/$instanceId'
     | '/instances/terminal/$instanceId'
     | '/_authenticated/audit/'
     | '/_authenticated/bare-metal/'
@@ -638,6 +651,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRouteWithChildren
+  InstancesConsoleInstanceIdRoute: typeof InstancesConsoleInstanceIdRoute
   InstancesTerminalInstanceIdRoute: typeof InstancesTerminalInstanceIdRoute
 }
 
@@ -802,6 +816,13 @@ declare module '@tanstack/react-router' {
       path: '/instances/terminal/$instanceId'
       fullPath: '/instances/terminal/$instanceId'
       preLoaderRoute: typeof InstancesTerminalInstanceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/instances/console/$instanceId': {
+      id: '/instances/console/$instanceId'
+      path: '/instances/console/$instanceId'
+      fullPath: '/instances/console/$instanceId'
+      preLoaderRoute: typeof InstancesConsoleInstanceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/volumes/$volumeId': {
@@ -1182,6 +1203,7 @@ const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRouteWithChildren,
+  InstancesConsoleInstanceIdRoute: InstancesConsoleInstanceIdRoute,
   InstancesTerminalInstanceIdRoute: InstancesTerminalInstanceIdRoute,
 }
 export const routeTree = rootRouteImport

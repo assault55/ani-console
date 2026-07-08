@@ -34,7 +34,14 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    optimizeDeps: {
+      include: ['@novnc/novnc'],
+      esbuildOptions: {
+        target: 'esnext',
+      },
+    },
     build: {
+      target: 'esnext',
       rollupOptions: {
         output: {
           manualChunks(id) {

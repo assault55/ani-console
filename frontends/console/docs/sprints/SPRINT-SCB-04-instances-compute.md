@@ -393,3 +393,27 @@ npm run typecheck
 npm run test:unit -- src/components/instances/InstanceTerminal.test.tsx src/components/instances/InstanceLogsPanel.test.tsx
 npx playwright test e2e/instances.spec.ts -g '实例列表可进入详情|容器实例终端新页面连接 exec WebSocket'
 ```
+
+---
+
+## 22. VM 实例 VNC 控制台新窗口模式（2026-07-08）
+
+按现有 Core v1 契约接入 VM 控制台：详情页“控制台”按钮打开独立页面，不复用 `_authenticated` AppShell 菜单；控制台页面调用 `POST /instances/{id}/console` 获取 `url/connect_url`，并使用 noVNC `RFB` 连接后端返回的 VNC WebSocket。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/$instanceId.tsx` | VM “控制台”按钮改为打开 `/instances/console/{instanceId}` 新窗口，容器终端入口保持 `/instances/terminal/{instanceId}` |
+| `src/routes/instances/console/$instanceId.tsx`、`src/routeTree.gen.ts` | 新增根级 VNC 控制台页面，绕过 Console 菜单栏，仅保留标题、实例 ID、关闭按钮和全高 VNC 画布区域 |
+| `src/components/instances/InstanceVncConsole.tsx`、`src/types/novnc.d.ts` | 新增 noVNC 控制台组件；调用 `POST /instances/{id}/console`，默认 `protocol: vnc`，连接返回的 `url/connect_url`，并处理连接中、已连接、断开和安全握手失败状态 |
+| `package.json`、`package-lock.json`、`vite.config.ts` | 引入 `@novnc/novnc`；Vite 显式预构建 noVNC 并将 dev/build target 调整为 `esnext`，满足 noVNC 1.7 top-level await 要求 |
+| `src/components/instances/InstanceVncConsole.test.tsx` | 覆盖 console session 创建、RFB 初始化参数与卸载断开 |
+| `e2e/instances.spec.ts` | 覆盖 VM 详情页控制台入口打开独立 URL，以及控制台页无菜单栏并向 Core v1 发送 `protocol: vnc` |
+
+验收：
+
+```bash
+npm run verify  # codegen/typecheck/unit passed; sandbox blocked pretest:e2e at playwright install
+npx playwright test e2e/instances.spec.ts -g 'VM 实例控制台打开独立 VNC 页面'  # 1 passed
+npx playwright test  # 37 passed
+npm run build
+```

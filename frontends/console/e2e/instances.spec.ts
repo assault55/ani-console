@@ -171,6 +171,60 @@ test.describe('实例与算力', () => {
     await expect(page.getByTestId('instance-terminal-output')).toContainText('blob-output')
   })
 
+  test('VM 实例控制台打开独立 VNC 页面', async ({ page }) => {
+    let consoleBody: Record<string, unknown> | undefined
+    await page.addInitScript(() => {
+      const state = window as typeof window & {
+        __openedUrls?: string[]
+      }
+      state.__openedUrls = []
+      window.open = (url?: string | URL) => {
+        if (url) state.__openedUrls?.push(String(url))
+        return null
+      }
+    })
+    await page.route('**/api/v1/instances/inst-vm-1', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-vm-1',
+          name: 'e2e-vm-console',
+          state: 'running',
+          kind: 'vm',
+          vpc_id: 'vpc-1',
+          subnet_id: 'subnet-1',
+          private_ip: '10.0.1.20',
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+    await page.route('**/api/v1/instances/inst-vm-1/console', async (route, request) => {
+      consoleBody = request.postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 200,
+        json: {
+          session_id: 'vnc-session-1',
+          protocol: 'vnc',
+          connect_url: 'ws://vnc.example/instances/inst-vm-1/console/vnc-session-1?token=short-ticket',
+          url: 'ws://vnc.example/instances/inst-vm-1/console/vnc-session-1?token=short-ticket',
+          expires_at: '2026-06-01T08:10:00Z',
+        },
+      })
+    })
+
+    await page.goto('/instances/inst-vm-1')
+    await expect(page.getByRole('heading', { name: 'e2e-vm-console' })).toBeVisible()
+    await page.getByRole('button', { name: '控制台' }).click()
+    await expect.poll(() => page.evaluate(() => window.__openedUrls)).toEqual(['/instances/console/inst-vm-1'])
+
+    await page.goto('/instances/console/inst-vm-1')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(page.getByTestId('instance-vnc-console')).toBeVisible()
+    await expect.poll(() => consoleBody?.protocol).toBe('vnc')
+  })
+
   test('创建实例时提交所选 VPC 子网和固定 IP', async ({ page }) => {
     let createBody: Record<string, unknown> | undefined
     await page.route('**/api/v1/instances', async (route, request) => {

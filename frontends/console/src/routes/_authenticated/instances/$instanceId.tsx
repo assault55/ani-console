@@ -5,10 +5,8 @@ import {
   Card,
   Descriptions,
   Empty,
-  Form,
   Message,
   Modal,
-  Select,
   Space,
   Spin,
   Tabs,
@@ -25,7 +23,6 @@ import { formatDateTime } from '@/lib/format'
 import { showApiError } from '@/api/helpers'
 import { newIdempotencyKey } from '@/lib/idempotency'
 import { getInstanceDisplayIp, getInstanceNetworkValue } from '@/lib/instance-network'
-import type { components } from '@/api/core-schema'
 
 export const Route = createFileRoute('/_authenticated/instances/$instanceId')({
   component: InstanceDetailPage,
@@ -42,12 +39,13 @@ function openTerminalWindow(instanceId: string) {
   window.open(url, `Connecting ${instanceId}`, `width=${width},height=${height},left=${left},top=${top},scrollbars=1,resizable=1`)
 }
 
-function getErrorText(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string') {
-    return (error as { message: string }).message
-  }
-  return ''
+function openConsoleWindow(instanceId: string) {
+  const url = `/instances/console/${encodeURIComponent(instanceId)}`
+  const width = 1200
+  const height = 800
+  const left = Math.max(0, window.screenX + Math.round((window.outerWidth - width) / 2))
+  const top = Math.max(0, window.screenY + Math.round((window.outerHeight - height) / 2))
+  window.open(url, `Console ${instanceId}`, `width=${width},height=${height},left=${left},top=${top},scrollbars=1,resizable=1`)
 }
 
 function TabQueryBody<T>({
@@ -79,10 +77,6 @@ function InstanceDetailPage() {
 export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: string; returnTo: string }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [consoleVisible, setConsoleVisible] = useState(false)
-  const [consoleProtocol, setConsoleProtocol] =
-    useState<components['schemas']['CreateInstanceConsoleSessionRequest']['protocol']>('novnc')
-  const [consoleUnavailableReason, setConsoleUnavailableReason] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
 
   const detail = useQuery({
@@ -155,28 +149,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
     onError: (e) => showApiError(e),
   })
 
-  const openConsole = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await coreApi.POST('/instances/{instance_id}/console', {
-        params: { path: { instance_id: instanceId } },
-        body: { protocol: consoleProtocol },
-      })
-      if (error) throw error
-      if (data?.url) window.open(data.url, '_blank')
-    },
-    onSuccess: () => setConsoleVisible(false),
-    onError: (e) => {
-      const message = getErrorText(e)
-      if (message.includes('/vnc') && message.includes('HTTP 406')) {
-        setConsoleUnavailableReason('当前集群/网关链路未正确支持 KubeVirt Console/VNC 通道（HTTP 406）')
-        setConsoleVisible(false)
-        Message.error('当前环境不支持 VNC 表示格式，请改用 serial 或 console 协议后重试。')
-        return
-      }
-      showApiError(e)
-    },
-  })
-
   const confirmDelete = () => {
     Modal.confirm({
       title: '删除实例',
@@ -212,11 +184,9 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
             {isVmInstance ? (
               <Button
                 type="primary"
-                loading={openConsole.isPending}
-                disabled={Boolean(consoleUnavailableReason)}
-                onClick={() => setConsoleVisible(true)}
+                onClick={() => openConsoleWindow(instanceId)}
               >
-                {consoleUnavailableReason ? '控制台（不可用）' : '控制台'}
+                控制台
               </Button>
             ) : null}
             <Button type="outline" onClick={() => openTerminalWindow(instanceId)}>
@@ -237,11 +207,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
           </Space>
         }
       />
-      {isVmInstance && consoleUnavailableReason ? (
-        <Card>
-          <div className="text-[var(--color-text-2)]">{consoleUnavailableReason}</div>
-        </Card>
-      ) : null}
       <Card>
         <Descriptions
           column={{ xs: 1, sm: 2, md: 3 }}
@@ -318,26 +283,6 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
           </Link>
         </Tabs.TabPane>
       </Tabs>
-      {isVmInstance ? (
-        <Modal
-          visible={consoleVisible}
-          title="打开控制台"
-          onCancel={() => setConsoleVisible(false)}
-          onOk={() => openConsole.mutateAsync()}
-          confirmLoading={openConsole.isPending}
-        >
-          <Form layout="vertical">
-            <Form.Item label="协议" required>
-              <Select value={consoleProtocol} onChange={setConsoleProtocol}>
-                <Select.Option value="console">console</Select.Option>
-                <Select.Option value="vnc">vnc</Select.Option>
-                <Select.Option value="novnc">novnc</Select.Option>
-                <Select.Option value="serial">serial</Select.Option>
-              </Select>
-            </Form.Item>
-          </Form>
-        </Modal>
-      ) : null}
     </div>
   )
 }
