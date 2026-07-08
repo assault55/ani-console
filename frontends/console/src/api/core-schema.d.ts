@@ -323,9 +323,31 @@ export interface paths {
         put?: never;
         /**
          * 创建实例终端 exec session
-         * @description 返回 WebSocket URL，用于 exec/终端接入；不暴露长期凭据。
+         * @description 返回可直接用于浏览器 WebSocket 握手的 ws_url 和短期一次性 token；不暴露长期凭据。
          */
         post: operations["createInstanceExecSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instances/{instance_id}/exec/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 连接实例终端 exec WebSocket
+         * @description 使用 createInstanceExecSession 返回的短期一次性 token 建立 WebSocket 连接。
+         *     浏览器客户端应直接连接 ws_url；握手鉴权通过 query 参数 token 完成，不要求也不支持依赖 Authorization header。
+         *     WebSocket 数据帧协议：普通 text/binary 帧作为 stdin 原始字节透传；stdout/stderr 由后端以 text/binary 原样回传；终端 resize 使用 JSON 控制帧 `{"type":"resize","cols":120,"rows":30}`。
+         */
+        get: operations["connectInstanceExecSession"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2944,10 +2966,17 @@ export interface components {
             id: string;
             /** Format: uuid */
             instance_id: string;
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description 浏览器可直接连接的 WebSocket URL；必须包含短期一次性 token query 参数，客户端无需也不能依赖 Authorization header 完成握手。
+             */
             ws_url: string;
+            /** @description 短期一次性 WebSocket 握手票据；与 ws_url query 中的 token 相同，供无法直接使用 ws_url 的客户端显式拼接。 */
             token?: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description exec session 与 token 的过期时间；客户端必须在过期前完成 WebSocket 握手。
+             */
             expires_at: string;
             dev_profile: components["schemas"]["CoreDevProfileInfo"];
         };
@@ -3773,6 +3802,41 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    connectInstanceExecSession: {
+        parameters: {
+            query: {
+                /** @description createInstanceExecSession 返回的短期一次性 WebSocket token */
+                token: string;
+            };
+            header?: never;
+            path: {
+                instance_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description WebSocket 协议切换成功 */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description exec session 已过期 */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listInstanceSecurityEvents: {

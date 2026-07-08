@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Form, Input, InputNumber, Message, Modal, Select, Space, Switch, Typography } from '@arco-design/web-react'
+import { Button, Form, Input, InputNumber, Message, Modal, Radio, Select, Space, Switch, Typography } from '@arco-design/web-react'
 import { useState } from 'react'
 import { coreApi } from '@/api/client'
 import { newIdempotencyKey } from '@/lib/idempotency'
@@ -12,7 +12,7 @@ import { showApiError } from '@/api/helpers'
 import { AsyncTaskPoller } from '@/components/feedback/AsyncTaskPoller'
 import { Ipv4CidrInput } from '@/components/forms/Ipv4CidrInput'
 import { listOrThrow } from '@/lib/api-list'
-import { optionalIpv4WithinCidrError } from '@/lib/validators'
+import { optionalIpv4WithinCidrError, subnetFixedOctets, suggestGatewayIp } from '@/lib/validators'
 import { getInstanceDisplayIp, getInstanceNetworkValue } from '@/lib/instance-network'
 import type { components } from '@/api/core-schema'
 
@@ -23,6 +23,8 @@ export const Route = createFileRoute('/_authenticated/instances/')({
 type Instance = components['schemas']['InstanceRecord']
 type CreateInstanceRequest = components['schemas']['CreateInstanceRequest']
 type InstanceKind = CreateInstanceRequest['kind']
+type NetworkMode = 'default' | 'vpc'
+type IpAllocationMode = 'auto' | 'manual'
 
 const VM_BOOT_IMAGE = 'quay.io/kubevirt/cirros-container-disk-demo:v1.2.0'
 const CONTAINER_IMAGE = 'dockerproxy.net/library/nginx:1.27-alpine'
@@ -43,6 +45,8 @@ type InstanceFormState = {
   gpu_model: string
   gpu_count: number
   replicas: number
+  network_mode: NetworkMode
+  ip_allocation: IpAllocationMode
   vpc_id: string
   subnet_id: string
   private_ip: string
@@ -108,6 +112,8 @@ const defaultInstanceForm: InstanceFormState = {
   gpu_model: '',
   gpu_count: 1,
   replicas: 1,
+  network_mode: 'default',
+  ip_allocation: 'auto',
   vpc_id: '',
   subnet_id: '',
   private_ip: '',
@@ -176,12 +182,12 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
     }
   }
 
-  if (form.subnet_id) {
+  if (form.network_mode === 'vpc' && form.subnet_id) {
     body.network = {
       vpc_id: optionalTrimmed(form.vpc_id),
       subnet_id: form.subnet_id,
-      private_ip: optionalTrimmed(form.private_ip),
     }
+    if (form.ip_allocation === 'manual') body.network.private_ip = optionalTrimmed(form.private_ip)
   }
 
   return body
@@ -313,13 +319,36 @@ export function InstanceCreateForm({
   })
   const selectedSubnets = (subnets.data?.items ?? []).filter((subnet) => !form.vpc_id || subnet.vpc_id === form.vpc_id)
   const selectedSubnet = selectedSubnets.find((subnet) => String(subnet.id) === form.subnet_id)
+  const selectedSubnetCidr = selectedSubnet?.cidr ? String(selectedSubnet.cidr) : ''
+  const manualIpFixedOctets = selectedSubnetCidr ? subnetFixedOctets(selectedSubnetCidr) : []
   const privateIpError =
-    form.private_ip && selectedSubnet?.cidr
-      ? optionalIpv4WithinCidrError(form.private_ip, String(selectedSubnet.cidr), '固定 IP', '子网 CIDR')
+    form.network_mode === 'vpc' && form.ip_allocation === 'manual' && form.private_ip && selectedSubnetCidr
+      ? optionalIpv4WithinCidrError(form.private_ip, selectedSubnetCidr, '固定 IP', '子网 CIDR')
       : undefined
+
+  const setNetworkMode = (mode: NetworkMode) => {
+    setForm((current) => ({
+      ...current,
+      network_mode: mode,
+      ip_allocation: mode === 'default' ? 'auto' : current.ip_allocation,
+      vpc_id: mode === 'default' ? '' : current.vpc_id,
+      subnet_id: mode === 'default' ? '' : current.subnet_id,
+      private_ip: mode === 'default' || current.ip_allocation === 'auto' ? '' : current.private_ip,
+    }))
+  }
+
+  const setIpAllocation = (mode: IpAllocationMode) => {
+    setForm((current) => ({
+      ...current,
+      ip_allocation: mode,
+      private_ip: mode === 'manual' && selectedSubnetCidr ? current.private_ip || suggestGatewayIp(selectedSubnetCidr) : '',
+    }))
+  }
 
   const create = useMutation({
     mutationFn: async () => {
+      if (form.network_mode === 'vpc' && !form.subnet_id) throw new Error('请选择子网')
+      if (form.network_mode === 'vpc' && form.ip_allocation === 'manual' && !form.private_ip) throw new Error('请输入固定 IP')
       if (privateIpError) throw new Error(privateIpError)
       const { error, response } = await coreApi.POST('/instances', { body: buildCreateInstanceBody(form) })
       if (error) throw error
@@ -338,7 +367,7 @@ export function InstanceCreateForm({
   return (
     <Form layout="vertical">
       <Form.Item label="名称" required>
-        <Input value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
+        <Input data-testid="instance-name-input" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
       </Form.Item>
       {!lockKind ? (
         <Form.Item label="类型">
@@ -362,48 +391,75 @@ export function InstanceCreateForm({
           <Typography.Text>{kindOptionMeta.find((item) => item.kind === form.kind)?.label}</Typography.Text>
         </Form.Item>
       )}
-      <Form.Item label="VPC">
-        <Select
-          data-testid="instance-vpc-select"
-          value={form.vpc_id}
-          onChange={(v) => setForm((f) => ({ ...f, vpc_id: v, subnet_id: '', private_ip: '' }))}
-          loading={vpcs.isLoading}
-          allowClear
-          placeholder="选择 VPC"
-        >
-          {(vpcs.data?.items ?? []).map((vpc) => (
-            <Select.Option key={String(vpc.id)} value={String(vpc.id)}>
-              {String(vpc.name ?? vpc.id)}
-            </Select.Option>
-          ))}
-        </Select>
+      <Form.Item label="网络">
+        <Radio.Group type="button" value={form.network_mode} onChange={setNetworkMode}>
+          <Radio value="default">默认网络</Radio>
+          <Radio value="vpc">VPC 网络</Radio>
+        </Radio.Group>
       </Form.Item>
-      <Form.Item label="子网">
-        <Select
-          data-testid="instance-subnet-select"
-          value={form.subnet_id}
-          onChange={(v) => setForm((f) => ({ ...f, subnet_id: v, private_ip: '' }))}
-          loading={subnets.isLoading}
-          disabled={!form.vpc_id}
-          allowClear
-          placeholder={form.vpc_id ? '选择子网' : '先选择 VPC'}
-        >
-          {selectedSubnets.map((subnet) => (
-            <Select.Option key={String(subnet.id)} value={String(subnet.id)}>
-              {String(subnet.name ?? subnet.id)}
-            </Select.Option>
-          ))}
-        </Select>
-      </Form.Item>
-      <Form.Item label="固定 IP" validateStatus={privateIpError ? 'error' : undefined} help={privateIpError}>
-        <div data-testid="instance-private-ip-input">
-          <Ipv4CidrInput
-            value={form.private_ip}
-            onChange={(v) => setForm((f) => ({ ...f, private_ip: v }))}
-            placeholder="10.0.1.10"
-          />
-        </div>
-      </Form.Item>
+      {form.network_mode === 'vpc' ? (
+        <>
+          <Form.Item label="VPC" required>
+            <Select
+              data-testid="instance-vpc-select"
+              value={form.vpc_id}
+              onChange={(v) => setForm((f) => ({ ...f, vpc_id: v, subnet_id: '', private_ip: '' }))}
+              loading={vpcs.isLoading}
+              allowClear
+              placeholder="选择 VPC"
+            >
+              {(vpcs.data?.items ?? []).map((vpc) => (
+                <Select.Option key={String(vpc.id)} value={String(vpc.id)}>
+                  {String(vpc.name ?? vpc.id)}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="子网" required>
+            <Select
+              data-testid="instance-subnet-select"
+              value={form.subnet_id}
+              onChange={(v) => {
+                const subnet = selectedSubnets.find((item) => String(item.id) === v)
+                const subnetCidr = subnet?.cidr ? String(subnet.cidr) : ''
+                setForm((f) => ({
+                  ...f,
+                  subnet_id: v,
+                  private_ip: f.ip_allocation === 'manual' && subnetCidr ? suggestGatewayIp(subnetCidr) : '',
+                }))
+              }}
+              loading={subnets.isLoading}
+              disabled={!form.vpc_id}
+              allowClear
+              placeholder={form.vpc_id ? '选择子网' : '先选择 VPC'}
+            >
+              {selectedSubnets.map((subnet) => (
+                <Select.Option key={String(subnet.id)} value={String(subnet.id)}>
+                  {String(subnet.name ?? subnet.id)}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="IP 分配">
+            <Radio.Group type="button" value={form.ip_allocation} onChange={setIpAllocation}>
+              <Radio value="auto">自动分配</Radio>
+              <Radio value="manual">手动指定</Radio>
+            </Radio.Group>
+          </Form.Item>
+          {form.ip_allocation === 'manual' ? (
+            <Form.Item label="固定 IP" validateStatus={privateIpError ? 'error' : undefined} help={privateIpError}>
+              <div data-testid="instance-private-ip-input">
+                <Ipv4CidrInput
+                  value={form.private_ip}
+                  onChange={(v) => setForm((f) => ({ ...f, private_ip: v }))}
+                  placeholder={selectedSubnetCidr ? suggestGatewayIp(selectedSubnetCidr) : '10.0.1.10'}
+                  disabledOctets={manualIpFixedOctets}
+                />
+              </div>
+            </Form.Item>
+          ) : null}
+        </>
+      ) : null}
       <Form.Item label="CPU">
         <Input value={form.cpu} onChange={(v) => setForm((f) => ({ ...f, cpu: v }))} placeholder="2" />
       </Form.Item>

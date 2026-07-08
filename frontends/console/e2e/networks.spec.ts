@@ -24,8 +24,10 @@ test.describe('网络资源', () => {
     await expect(page.getByText('igw-1')).toBeVisible()
   })
 
-  test('子网列表按 VPC 服务端筛选', async ({ page }) => {
+  test('子网列表默认展示全部并支持按 VPC 筛选', async ({ page }) => {
     await page.goto('/networks/subnets')
+    await expect(page.getByText('app-subnet')).toBeVisible()
+
     const filtered = page.waitForRequest((request) => {
       const url = new URL(request.url())
       return url.pathname.endsWith('/api/v1/networks/subnets') && url.searchParams.get('vpc_id') === 'vpc-1'

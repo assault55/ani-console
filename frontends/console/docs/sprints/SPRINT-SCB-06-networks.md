@@ -181,8 +181,6 @@ npm run test -- src/lib/side-menu-match.test.ts
 npx playwright test e2e/navigation.spec.ts e2e/networks.spec.ts
 ```
 
----
-
 ## 12. 移除网络总览页（2026-07-06）
 
 网络管理改为侧栏五个资源子菜单后，独立总览页不再保留，减少一次跳转。
@@ -197,4 +195,21 @@ npx playwright test e2e/navigation.spec.ts e2e/networks.spec.ts
 ```bash
 npm run typecheck
 npx playwright test e2e/navigation.spec.ts e2e/networks.spec.ts
+```
+
+---
+
+## 13. 子网默认加载与 VPC 筛选（2026-07-07）
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/networks/subnets/index.tsx` | 子网页进入后默认请求 `/networks/subnets?limit=50` 展示全部子网；左上角 VPC Select 仅作为筛选条件，选中后请求带 `vpc_id`，清空后回到全部 |
+| `e2e/networks.spec.ts` | 子网用例改为验证默认展示 `app-subnet`，并保留选择 VPC 后发起 `vpc_id` 服务端筛选请求 |
+
+验收：
+
+```bash
+npm run typecheck
+npx playwright test e2e/networks.spec.ts -g "子网列表默认展示全部并支持按 VPC 筛选"
+npx playwright test e2e/networks.spec.ts
 ```

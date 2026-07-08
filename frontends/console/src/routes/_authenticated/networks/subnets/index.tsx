@@ -54,7 +54,7 @@ function SubnetsPage() {
     <SimpleResourceCrud
       title="子网"
       queryKey={['network-subnets', filterVpcId]}
-      emptyDescription={filterVpcId ? '该 VPC 下暂无子网，点击右上角创建' : '请选择 VPC 查看子网'}
+      emptyDescription={filterVpcId ? '该 VPC 下暂无子网，点击右上角创建' : '暂无子网，点击右上角创建'}
       showState
       filters={
         <Select
@@ -74,13 +74,11 @@ function SubnetsPage() {
         </Select>
       }
       list={() =>
-        filterVpcId
-          ? listOrThrow(() =>
-              coreApi.GET('/networks/subnets', {
-                params: { query: { limit: 50, vpc_id: filterVpcId } },
-              }),
-            )
-          : Promise.resolve({ items: [], next_cursor: null })
+        listOrThrow(() =>
+          coreApi.GET('/networks/subnets', {
+            params: { query: { limit: 50, vpc_id: filterVpcId || undefined } },
+          }),
+        )
       }
       onCreate={async () => {}}
       extraColumns={[
