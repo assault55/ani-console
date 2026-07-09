@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Select, Space, Spin, Typography } from '@arco-design/web-react'
 import { coreApi, CORE_API_BASE } from '@/api/client'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
+import { useAuthStore } from '@/stores/auth'
 import type { operations } from '@/api/core-schema'
 
 type ListInstanceLogsQuery = NonNullable<operations['listInstanceLogs']['parameters']['query']>
 type LogLevel = NonNullable<ListInstanceLogsQuery['level']>
-type StreamStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'polling'
+type StreamStatus = 'idle' | 'connecting' | 'connected'
 
 const LEVEL_OPTIONS: LogLevel[] = ['debug', 'info', 'warn', 'error']
 const LOG_TAIL_LINES = 100
 const AUTO_SCROLL_THRESHOLD_PX = 24
-const FALLBACK_POLL_MS = 2000
 
 function buildLogStreamUrl(instanceId: string, level: LogLevel, container?: string): string {
   const params = new URLSearchParams({
@@ -30,6 +30,97 @@ async function fetchInstanceLogs(instanceId: string, level: LogLevel): Promise<s
   })
   if (error) throw error
   return data ?? ''
+}
+
+function parseSseDataValue(value: string): string {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (typeof parsed === 'string') return parsed
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>
+      for (const key of ['message', 'log', 'line', 'data', 'text']) {
+        if (typeof record[key] === 'string') return record[key] as string
+      }
+    }
+  } catch {
+    return value
+  }
+  return value
+}
+
+async function readLiveLogStream(response: Response, appendLog: (line: string) => void, signal: AbortSignal) {
+  if (!response.body) throw new Error('实时日志响应没有可读取的 body')
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const flushEvent = (rawEvent: string) => {
+    const lines = rawEvent.split(/\r?\n/)
+    let eventType = 'message'
+    const dataLines: string[] = []
+
+    for (const line of lines) {
+      if (line.startsWith('event:')) eventType = line.slice('event:'.length).trim()
+      if (line.startsWith('data:')) dataLines.push(line.slice('data:'.length).trimStart())
+    }
+
+    if (eventType !== 'log' && eventType !== 'message') return
+    if (!dataLines.length) return
+    appendLog(parseSseDataValue(dataLines.join('\n')))
+  }
+
+  while (!signal.aborted) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const events = buffer.split(/\r?\n\r?\n/)
+    buffer = events.pop() ?? ''
+    for (const event of events) {
+      flushEvent(event)
+    }
+  }
+
+  const tail = `${buffer}${decoder.decode()}`
+  if (tail.trim()) flushEvent(tail)
+}
+
+async function fetchLiveLogs({
+  instanceId,
+  level,
+  container,
+  signal,
+  appendLog,
+  onConnected,
+}: {
+  instanceId: string
+  level: LogLevel
+  container?: string
+  signal: AbortSignal
+  appendLog: (line: string) => void
+  onConnected: () => void
+}) {
+  const token = useAuthStore.getState().getAccessToken()
+  const response = await fetch(buildLogStreamUrl(instanceId, level, container), {
+    method: 'GET',
+    headers: {
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: 'include',
+    signal,
+  })
+
+  if (response.status === 401) {
+    throw new Error('登录已过期或实时日志请求未带鉴权')
+  }
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(body || `实时日志请求失败：HTTP ${response.status}`)
+  }
+
+  onConnected()
+  await readLiveLogStream(response, appendLog, signal)
 }
 
 export function InstanceLogsPanel({
@@ -94,48 +185,39 @@ export function InstanceLogsPanel({
     }
 
     let cancelled = false
-    let eventSource: EventSource | null = null
-    let pollTimer: number | null = null
+    const controller = new AbortController()
 
-    async function startPollingFallback() {
-      setStreamStatus('polling')
-      pollTimer = window.setInterval(async () => {
-        try {
-          const history = await fetchInstanceLogs(instanceId, level)
-          if (!cancelled) setLogs(history)
-        } catch (err) {
-          if (!cancelled) setError(err)
-        }
-      }, FALLBACK_POLL_MS)
-    }
-
-    function connect() {
-      if (!('EventSource' in window)) {
-        void startPollingFallback()
-        return
-      }
-
+    async function connect() {
       setStreamStatus('connecting')
-      eventSource = new EventSource(buildLogStreamUrl(instanceId, level, container), { withCredentials: true })
-      eventSource.onopen = () => {
-        if (!cancelled) setStreamStatus('connected')
+      setError(null)
+      try {
+        await fetchLiveLogs({
+          instanceId,
+          level,
+          container,
+          signal: controller.signal,
+          appendLog: (line) => {
+            if (!cancelled) {
+              setLogs((current) => (current ? `${current}\n${line}` : line))
+            }
+          },
+          onConnected: () => {
+            if (!cancelled) setStreamStatus('connected')
+          },
+        })
+      } catch (err) {
+        if (!cancelled && !controller.signal.aborted) {
+          setStreamStatus('idle')
+          setError(err)
+        }
       }
-      eventSource.onerror = () => {
-        if (!cancelled) setStreamStatus('reconnecting')
-      }
-      const appendLog = (event: MessageEvent<string>) => {
-        setLogs((current) => (current ? `${current}\n${event.data}` : event.data))
-      }
-      eventSource.onmessage = appendLog
-      eventSource.addEventListener('log', appendLog)
     }
 
-    connect()
+    void connect()
 
     return () => {
       cancelled = true
-      eventSource?.close()
-      if (pollTimer) window.clearInterval(pollTimer)
+      controller.abort()
     }
   }, [active, container, instanceId, level, liveEnabled])
 
@@ -163,12 +245,11 @@ export function InstanceLogsPanel({
           {liveEnabled ? '停止实时' : '开启实时'}
         </Button>
         <Typography.Text type="secondary">
-          {streamStatus === 'polling' ? '当前环境不支持 EventSource，已降级为 2 秒刷新' : null}
           {streamStatus === 'connected' ? '实时日志已连接' : null}
           {streamStatus === 'connecting' ? '正在连接实时日志…' : null}
         </Typography.Text>
       </Space>
-      {streamStatus === 'reconnecting' ? <Alert type="warning" content="日志流连接中断，正在重连" /> : null}
+      {liveEnabled && streamStatus === 'idle' && !error ? <Alert type="warning" content="实时日志未连接" /> : null}
       {error ? <ApiErrorAlert error={error} /> : null}
       <div
         ref={outputRef}

@@ -441,3 +441,5 @@ npm run build
 ```bash
 npm run test:unit -- src/components/instances/InstanceLogsPanel.test.tsx
 ```
+
+补充修正：`follow=true` 实时日志接口仍要求 `Authorization: Bearer <access_token>`；浏览器原生 `EventSource` 无法设置该 header，会导致 Core 侧 tenant 解析为空并返回 401。实时日志现改为 `fetch` streaming，请求头显式携带当前登录 access token，通过 `response.body.getReader()` 解析 `text/event-stream` 的 `event: log` / `data: ...` 并追加日志；组件卸载、停止实时、实例或 level 变化时通过 `AbortController` 取消旧请求。

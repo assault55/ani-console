@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InstanceLogsPanel } from './InstanceLogsPanel'
 
 const mocks = vi.hoisted(() => ({
   coreGet: vi.fn(),
+  getAccessToken: vi.fn(),
 }))
 
 vi.mock('@/api/client', () => ({
@@ -13,123 +15,154 @@ vi.mock('@/api/client', () => ({
   },
 }))
 
-type Listener = (event: MessageEvent<string>) => void
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: {
+    getState: () => ({
+      getAccessToken: mocks.getAccessToken,
+    }),
+  },
+}))
 
-class MockEventSource {
-  static instances: MockEventSource[] = []
+type FetchCall = {
+  url: string
+  init: RequestInit
+}
 
-  onopen: (() => void) | null = null
-  onerror: (() => void) | null = null
-  listeners = new Map<string, Listener[]>()
-  closed = false
+function createSseResponse(chunks: string[], init?: ResponseInit): Response {
+  const encoder = new TextEncoder()
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(chunk))
+        }
+        controller.close()
+      },
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+      ...init,
+    },
+  )
+}
 
-  constructor(
-    public url: string,
-    public init?: EventSourceInit,
-  ) {
-    MockEventSource.instances.push(this)
-  }
-
-  addEventListener(type: string, listener: Listener) {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener])
-  }
-
-  close() {
-    this.closed = true
-  }
-
-  emitLog(data: unknown) {
-    for (const listener of this.listeners.get('log') ?? []) {
-      listener({ data: typeof data === 'string' ? data : JSON.stringify(data) } as MessageEvent<string>)
-    }
-  }
+function installFetchMock(responseFactory: () => Response | Promise<Response>) {
+  const calls: FetchCall[] = []
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init: init ?? {} })
+    return responseFactory()
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return { calls, fetchMock }
 }
 
 describe('InstanceLogsPanel', () => {
   beforeEach(() => {
-    MockEventSource.instances = []
+    mocks.getAccessToken.mockReturnValue('unit-access-token')
     mocks.coreGet.mockResolvedValue({
       data: '2026-07-06T16:30:00Z info main history ready',
     })
-    vi.stubGlobal('EventSource', MockEventSource)
   })
 
   afterEach(() => {
     mocks.coreGet.mockReset()
+    mocks.getAccessToken.mockReset()
     vi.unstubAllGlobals()
   })
 
-  it('loads history without creating EventSource by default', async () => {
+  it('loads history without creating a live stream by default', async () => {
+    const { fetchMock } = installFetchMock(() => createSseResponse([]))
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
-    expect(MockEventSource.instances).toHaveLength(0)
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(mocks.coreGet).toHaveBeenCalledWith('/instances/{instance_id}/logs', {
       params: { path: { instance_id: 'inst-1' }, query: { follow: false, limit: 100, level: 'info' } },
       parseAs: 'text',
     })
   })
 
-  it('starts and stops live EventSource from the live button', async () => {
+  it('starts live fetch stream with Authorization header and appends SSE log data', async () => {
+    const { calls } = installFetchMock(() =>
+      createSseResponse([
+        'event: log\n',
+        'data: {"message":"2026-07-06T16:31:00Z info main stream ready"}\n\n',
+      ]),
+    )
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
     fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
 
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
-
-    expect(MockEventSource.instances[0].url).toBe('/api/v1/instances/inst-1/logs?follow=true&tail_lines=100&level=info')
-    expect(MockEventSource.instances[0].url).not.toContain('pod')
-    expect(MockEventSource.instances[0].init).toEqual({ withCredentials: true })
-
-    act(() => {
-      MockEventSource.instances[0].emitLog('2026-07-06T16:31:00Z info main stream ready')
-    })
-
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].url).toBe('/api/v1/instances/inst-1/logs?follow=true&tail_lines=100&level=info')
+    expect(calls[0].url).not.toContain('unit-access-token')
+    expect(new Headers(calls[0].init.headers).get('Authorization')).toBe('Bearer unit-access-token')
     await screen.findByText(/stream ready/)
-
-    fireEvent.click(screen.getByRole('button', { name: '停止实时' }))
-    expect(MockEventSource.instances[0].closed).toBe(true)
   })
 
-  it('reconnects when level changes after live is enabled', async () => {
+  it('stops live fetch stream from the live button', async () => {
+    const { calls } = installFetchMock(() => createSseResponse([]))
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
     fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
+    await waitFor(() => expect(calls).toHaveLength(1))
+
+    fireEvent.click(screen.getByRole('button', { name: '停止实时' }))
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal)
+    expect((calls[0].init.signal as AbortSignal).aborted).toBe(true)
+  })
+
+  it('aborts the old live fetch stream when level changes', async () => {
+    const { calls } = installFetchMock(() => createSseResponse([]))
+    render(<InstanceLogsPanel instanceId="inst-1" active />)
+
+    await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
 
     fireEvent.click(screen.getByTestId('instance-log-level-select'))
     fireEvent.click(await screen.findByText('debug'))
 
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(2))
-    expect(MockEventSource.instances[0].closed).toBe(true)
-    expect(MockEventSource.instances[1].url).toBe('/api/v1/instances/inst-1/logs?follow=true&tail_lines=100&level=debug')
+    await waitFor(() => expect(calls).toHaveLength(2))
+    expect((calls[0].init.signal as AbortSignal).aborted).toBe(true)
+    expect(calls[1].url).toBe('/api/v1/instances/inst-1/logs?follow=true&tail_lines=100&level=debug')
   })
 
-  it('closes EventSource on unmount', async () => {
-    const view = render(<InstanceLogsPanel instanceId="inst-1" active />)
+  it('does not keep duplicate active streams under StrictMode', async () => {
+    const { calls } = installFetchMock(() => createSseResponse([]))
+    render(
+      <StrictMode>
+        <InstanceLogsPanel instanceId="inst-1" active />
+      </StrictMode>,
+    )
 
     await screen.findByText(/history ready/)
     fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0))
 
-    view.unmount()
-
-    expect(MockEventSource.instances[0].closed).toBe(true)
+    expect(calls.filter((call) => !(call.init.signal as AbortSignal).aborted)).toHaveLength(1)
   })
 
-  it('shows reconnecting state on EventSource error', async () => {
+  it('shows auth error when live fetch returns 401', async () => {
+    installFetchMock(() => new Response('missing bearer', { status: 401 }))
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
     fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
-    await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
 
-    act(() => {
-      MockEventSource.instances[0].onerror?.()
-    })
+    await screen.findByText('登录已过期或实时日志请求未带鉴权')
+  })
 
-    await screen.findByText('日志流连接中断，正在重连')
+  it('shows backend error text when live fetch returns non-2xx', async () => {
+    installFetchMock(() => new Response('backend stream failed', { status: 500 }))
+    render(<InstanceLogsPanel instanceId="inst-1" active />)
+
+    await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
+
+    await screen.findByText('backend stream failed')
   })
 })
