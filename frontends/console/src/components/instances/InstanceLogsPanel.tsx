@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Empty, Select, Space, Spin, Typography } from '@arco-design/web-react'
+import { Alert, Button, Empty, Select, Space, Spin, Typography } from '@arco-design/web-react'
 import { coreApi, CORE_API_BASE } from '@/api/client'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import type { operations } from '@/api/core-schema'
@@ -45,6 +45,7 @@ export function InstanceLogsPanel({
   const [logs, setLogs] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
+  const [liveEnabled, setLiveEnabled] = useState(false)
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('idle')
   const outputRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
@@ -57,13 +58,12 @@ export function InstanceLogsPanel({
 
   useEffect(() => {
     if (!active) {
+      setLiveEnabled(false)
       setStreamStatus('idle')
       return
     }
 
     let cancelled = false
-    let eventSource: EventSource | null = null
-    let pollTimer: number | null = null
 
     async function loadHistory() {
       setLoading(true)
@@ -80,6 +80,23 @@ export function InstanceLogsPanel({
       }
     }
 
+    void loadHistory()
+
+    return () => {
+      cancelled = true
+    }
+  }, [active, instanceId, level])
+
+  useEffect(() => {
+    if (!active || !liveEnabled) {
+      setStreamStatus('idle')
+      return
+    }
+
+    let cancelled = false
+    let eventSource: EventSource | null = null
+    let pollTimer: number | null = null
+
     async function startPollingFallback() {
       setStreamStatus('polling')
       pollTimer = window.setInterval(async () => {
@@ -92,12 +109,9 @@ export function InstanceLogsPanel({
       }, FALLBACK_POLL_MS)
     }
 
-    async function connect() {
-      await loadHistory()
-      if (cancelled) return
-
+    function connect() {
       if (!('EventSource' in window)) {
-        await startPollingFallback()
+        void startPollingFallback()
         return
       }
 
@@ -123,7 +137,7 @@ export function InstanceLogsPanel({
       eventSource?.close()
       if (pollTimer) window.clearInterval(pollTimer)
     }
-  }, [active, container, instanceId, level])
+  }, [active, container, instanceId, level, liveEnabled])
 
   const handleScroll = () => {
     const output = outputRef.current
@@ -145,6 +159,9 @@ export function InstanceLogsPanel({
             </Select.Option>
           ))}
         </Select>
+        <Button type={liveEnabled ? 'secondary' : 'primary'} onClick={() => setLiveEnabled((enabled) => !enabled)}>
+          {liveEnabled ? '停止实时' : '开启实时'}
+        </Button>
         <Typography.Text type="secondary">
           {streamStatus === 'polling' ? '当前环境不支持 EventSource，已降级为 2 秒刷新' : null}
           {streamStatus === 'connected' ? '实时日志已连接' : null}

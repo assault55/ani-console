@@ -59,10 +59,23 @@ describe('InstanceLogsPanel', () => {
     vi.unstubAllGlobals()
   })
 
-  it('creates EventSource with Core follow path and appends text log events', async () => {
+  it('loads history without creating EventSource by default', async () => {
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
+    expect(MockEventSource.instances).toHaveLength(0)
+    expect(mocks.coreGet).toHaveBeenCalledWith('/instances/{instance_id}/logs', {
+      params: { path: { instance_id: 'inst-1' }, query: { follow: false, limit: 100, level: 'info' } },
+      parseAs: 'text',
+    })
+  })
+
+  it('starts and stops live EventSource from the live button', async () => {
+    render(<InstanceLogsPanel instanceId="inst-1" active />)
+
+    await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
+
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
 
     expect(MockEventSource.instances[0].url).toBe('/api/v1/instances/inst-1/logs?follow=true&tail_lines=100&level=info')
@@ -74,12 +87,16 @@ describe('InstanceLogsPanel', () => {
     })
 
     await screen.findByText(/stream ready/)
+
+    fireEvent.click(screen.getByRole('button', { name: '停止实时' }))
+    expect(MockEventSource.instances[0].closed).toBe(true)
   })
 
-  it('reconnects when level changes', async () => {
+  it('reconnects when level changes after live is enabled', async () => {
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
 
     fireEvent.click(screen.getByTestId('instance-log-level-select'))
@@ -94,6 +111,7 @@ describe('InstanceLogsPanel', () => {
     const view = render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
 
     view.unmount()
@@ -105,6 +123,7 @@ describe('InstanceLogsPanel', () => {
     render(<InstanceLogsPanel instanceId="inst-1" active />)
 
     await screen.findByText(/history ready/)
+    fireEvent.click(screen.getByRole('button', { name: '开启实时' }))
     await waitFor(() => expect(MockEventSource.instances).toHaveLength(1))
 
     act(() => {

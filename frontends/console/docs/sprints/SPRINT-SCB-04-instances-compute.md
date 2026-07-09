@@ -423,3 +423,21 @@ npm run build
 - 使用临时 Bearer token 访问 Gateway `http://192.168.102.51:30080`；未带 token 请求返回 401，带 token 后 `GET /api/v1/instances?limit=20&kind=vm` 返回 200 空列表，确认鉴权链路通过。
 - `POST /api/v1/instances/nonexistent-vm-for-console/console` 返回 400 `INSTANCE_CONSOLE_FAILED`，说明请求已进入实例控制台后端逻辑；当前租户无 VM 实例，暂无法完成真实 noVNC 会话握手与画面验证。
 - 本地回归覆盖仍以 mock/e2e 验证控制台入口、独立页面和 `protocol: vnc` 请求契约。
+
+---
+
+## 23. 实例日志默认历史模式与手动实时开关（2026-07-09）
+
+实例详情日志 Tab 默认只加载历史日志，不再自动连接 SSE 实时流；用户点击“开启实时”后才请求 `follow=true`，点击“停止实时”关闭连接。切换日志级别时会重新拉取历史日志；若实时已开启，则同步重连实时流。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/components/instances/InstanceLogsPanel.tsx` | 拆分历史日志加载与实时流连接 effect；新增“开启实时 / 停止实时”按钮控制 EventSource 生命周期 |
+| `src/components/instances/InstanceLogsPanel.test.tsx` | 覆盖默认不创建 EventSource、按钮开启/停止实时、实时开启后切换级别重连、卸载关闭和错误提示 |
+| `docs/superpowers/plans/2026-07-09-instance-logs-manual-live.md` | 记录本轮行为调整计划 |
+
+验收：
+
+```bash
+npm run test:unit -- src/components/instances/InstanceLogsPanel.test.tsx
+```
