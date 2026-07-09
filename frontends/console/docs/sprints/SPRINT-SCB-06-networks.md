@@ -213,3 +213,48 @@ npm run typecheck
 npx playwright test e2e/networks.spec.ts -g "子网列表默认展示全部并支持按 VPC 筛选"
 npx playwright test e2e/networks.spec.ts
 ```
+
+---
+
+## 14. 路由创建表单与离线验收（2026-07-08）
+
+集群暂不可用时，先把 Console 路由页的前端契约与 mock E2E 做实：`/networks/routes` 继续使用正式 Core v1 路径，不引入临时 API。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/networks/routes/index.tsx` | 路由创建 Dialog 增加 VPC 与下一跳 ID 必填校验；VPC/下一跳控件补 `aria-label`，提交体保持 `CreateNetworkRouteRequest` 契约 |
+| `e2e/networks.spec.ts` | 覆盖空表单不发起 `POST /api/v1/networks/routes`；覆盖有效创建请求体包含 `vpc_id`、`destination_cidr`、`next_hop_type`、`next_hop_id`、`idempotency_key` |
+| `docs/superpowers/plans/2026-07-08-network-routes-console.md` | 记录本轮可离线执行的实现计划 |
+
+离线验收（不依赖真实集群）：
+
+```bash
+npm run typecheck
+npm run test
+npx playwright test e2e/networks.spec.ts -g "创建路由"
+npx playwright test e2e/networks.spec.ts
+npm run build
+```
+
+真实集群恢复后联调：
+
+```text
+GET /api/v1/networks/routes?vpc_id=<vpc_id>
+POST /api/v1/networks/routes
+GET /api/v1/networks/routes/{route_id}
+DELETE /api/v1/networks/routes/{route_id}
+```
+
+真实集群验证（2026-07-09）：
+
+```text
+GET /api/v1/networks/vpcs?limit=20 -> 200
+GET /api/v1/networks/routes?limit=20 -> 200
+POST /api/v1/networks/vpcs -> 201
+POST /api/v1/networks/routes -> 201, dev_profile.real_provider=true, provider=kubeovn
+GET /api/v1/networks/routes/{route_id} -> 200
+GET /api/v1/networks/routes?vpc_id={vpc_id} -> 200, total=1
+DELETE /api/v1/networks/routes/{route_id} -> 403（临时 user token 无 delete 权限；测试对象已通过集群管理员路径清理）
+```
+
+浏览器联调：本地 Console dev server 代理到真实 Gateway，注入临时 token 后打开 `/networks/routes`，确认路由列表与 VPC Select 请求均为 200；空创建表单展示 `VPC不能为空` / `下一跳 ID不能为空`，且未发起 `POST /api/v1/networks/routes`。

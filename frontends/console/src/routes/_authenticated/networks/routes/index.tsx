@@ -8,7 +8,7 @@ import { coreApi } from '@/api/client'
 import { newIdempotencyKey } from '@/lib/idempotency'
 import { listOrThrow } from '@/lib/api-list'
 import { formatDateTime } from '@/lib/format'
-import { ipv4CidrError, requireIpv4Cidr } from '@/lib/validators'
+import { assertNonEmpty, ipv4CidrError, requireIpv4Cidr } from '@/lib/validators'
 
 export const Route = createFileRoute('/_authenticated/networks/routes/')({
   component: NetworkRoutesPage,
@@ -21,6 +21,8 @@ function NetworkRoutesPage() {
   const [nextHopType, setNextHopType] = useState<'gateway' | 'instance' | 'nat'>('gateway')
   const [nextHopId, setNextHopId] = useState('')
   const [description, setDescription] = useState('')
+  const [vpcIdError, setVpcIdError] = useState<string>()
+  const [nextHopIdError, setNextHopIdError] = useState<string>()
   const destinationCidrError = ipv4CidrError(destinationCidr, '目标网段')
   const vpcs = useQuery({
     queryKey: ['network-vpcs', 'select'],
@@ -61,8 +63,17 @@ function NetworkRoutesPage() {
       createForm={{
         content: (
           <Form layout="vertical">
-            <Form.Item label="VPC" required>
-              <Select value={vpcId} onChange={setVpcId} loading={vpcs.isLoading} placeholder="选择 VPC">
+            <Form.Item label="VPC" required validateStatus={vpcIdError ? 'error' : undefined} help={vpcIdError}>
+              <Select
+                aria-label="VPC"
+                value={vpcId}
+                onChange={(value) => {
+                  setVpcId(value)
+                  setVpcIdError(undefined)
+                }}
+                loading={vpcs.isLoading}
+                placeholder="选择 VPC"
+              >
                 {(vpcs.data?.items ?? []).map((vpc) => (
                   <Select.Option key={String(vpc.id)} value={String(vpc.id)}>
                     {String(vpc.name ?? vpc.id)}
@@ -85,8 +96,20 @@ function NetworkRoutesPage() {
                 <Select.Option value="nat">nat</Select.Option>
               </Select>
             </Form.Item>
-            <Form.Item label="下一跳 ID" required>
-              <Input value={nextHopId} onChange={setNextHopId} />
+            <Form.Item
+              label="下一跳 ID"
+              required
+              validateStatus={nextHopIdError ? 'error' : undefined}
+              help={nextHopIdError}
+            >
+              <Input
+                aria-label="下一跳 ID"
+                value={nextHopId}
+                onChange={(value) => {
+                  setNextHopId(value)
+                  setNextHopIdError(undefined)
+                }}
+              />
             </Form.Item>
             <Form.Item label="描述">
               <Input value={description} onChange={setDescription} />
@@ -94,12 +117,19 @@ function NetworkRoutesPage() {
           </Form>
         ),
         onSubmit: async () => {
+          const nextVpcIdError = vpcId.trim() ? undefined : 'VPC不能为空'
+          const nextNextHopIdError = nextHopId.trim() ? undefined : '下一跳 ID不能为空'
+          setVpcIdError(nextVpcIdError)
+          setNextHopIdError(nextNextHopIdError)
+          if (nextVpcIdError || destinationCidrError || nextNextHopIdError) {
+            throw new Error('请完整填写路由信息')
+          }
           const { error } = await coreApi.POST('/networks/routes', {
             body: {
-              vpc_id: vpcId,
+              vpc_id: assertNonEmpty(vpcId, 'VPC'),
               destination_cidr: requireIpv4Cidr(destinationCidr, '目标网段'),
               next_hop_type: nextHopType,
-              next_hop_id: nextHopId,
+              next_hop_id: assertNonEmpty(nextHopId, '下一跳 ID'),
               description: description || undefined,
               idempotency_key: newIdempotencyKey(),
             },
@@ -111,6 +141,8 @@ function NetworkRoutesPage() {
           setDestinationCidr('0.0.0.0/0')
           setNextHopType('gateway')
           setNextHopId('')
+          setVpcIdError(undefined)
+          setNextHopIdError(undefined)
           setDescription('')
         },
       }}

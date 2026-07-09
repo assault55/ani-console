@@ -417,3 +417,9 @@ npx playwright test e2e/instances.spec.ts -g 'VM 实例控制台打开独立 VNC
 npx playwright test  # 37 passed
 npm run build
 ```
+
+真实集群验证（2026-07-09）：
+
+- 使用临时 Bearer token 访问 Gateway `http://192.168.102.51:30080`；未带 token 请求返回 401，带 token 后 `GET /api/v1/instances?limit=20&kind=vm` 返回 200 空列表，确认鉴权链路通过。
+- `POST /api/v1/instances/nonexistent-vm-for-console/console` 返回 400 `INSTANCE_CONSOLE_FAILED`，说明请求已进入实例控制台后端逻辑；当前租户无 VM 实例，暂无法完成真实 noVNC 会话握手与画面验证。
+- 本地回归覆盖仍以 mock/e2e 验证控制台入口、独立页面和 `protocol: vnc` 请求契约。

@@ -52,6 +52,62 @@ test.describe('网络资源', () => {
     await deleted
   })
 
+  test('创建路由必填项缺失时不提交请求', async ({ page }) => {
+    const postBodies: Record<string, unknown>[] = []
+    await page.route('**/api/v1/networks/routes', async (route, request) => {
+      if (request.method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      postBodies.push(request.postDataJSON() as Record<string, unknown>)
+      await route.fulfill({ status: 201, json: { id: 'route-new' } })
+    })
+
+    await page.goto('/networks/routes')
+    await page.getByRole('button', { name: '创建' }).click()
+    await page.getByRole('button', { name: '确定' }).click()
+
+    await expect(page.getByText('VPC不能为空')).toBeVisible()
+    await expect(page.getByText('下一跳 ID不能为空')).toBeVisible()
+    await expect.poll(() => postBodies).toEqual([])
+  })
+
+  test('创建路由提交 Core 契约请求体', async ({ page }) => {
+    let createBody: Record<string, unknown> | undefined
+    await page.route('**/api/v1/networks/routes', async (route, request) => {
+      if (request.method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      createBody = request.postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        json: {
+          id: 'route-new',
+          vpc_id: 'vpc-1',
+          destination_cidr: '0.0.0.0/0',
+          next_hop_type: 'gateway',
+          next_hop_id: 'igw-new',
+          created_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+
+    await page.goto('/networks/routes')
+    await page.getByRole('button', { name: '创建' }).click()
+    const modal = page.locator('.arco-modal')
+    await modal.getByRole('combobox', { name: 'VPC' }).click()
+    await page.getByRole('option', { name: 'prod-vpc' }).click()
+    await modal.getByLabel('下一跳 ID').fill('igw-new')
+    await modal.getByRole('button', { name: '确定' }).click()
+
+    await expect.poll(() => createBody?.vpc_id).toBe('vpc-1')
+    expect(createBody?.destination_cidr).toBe('0.0.0.0/0')
+    expect(createBody?.next_hop_type).toBe('gateway')
+    expect(createBody?.next_hop_id).toBe('igw-new')
+    expect(typeof createBody?.idempotency_key).toBe('string')
+  })
+
   test('安全组详情可提交规则整包更新', async ({ page }) => {
     await page.goto('/networks/security-groups')
     await page.getByRole('button', { name: 'web-sg' }).click()

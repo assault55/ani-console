@@ -101,7 +101,7 @@
 | 文件存储 | `/filesystems`, `/filesystems/$id` | P6, P12 | 列表 + 挂载目标 |
 | 对象存储 | `/objects` | P6, P12 | 桶/上传/下载/删除 |
 | 向量库 | `/vector-stores` | P7, SCB-07 | 列表 CRUD + 详情 Drawer + 检索/插入 |
-| 网络 | `/networks/*` 五类 | P5, SCB-06 | 列表 CRUD + 详情 Drawer（路由无单条 GET） |
+| 网络 | `/networks/*` 五类 | P5, SCB-06 | 列表 CRUD + 详情 Drawer（含路由 GET/DELETE） |
 | Registry | `/registry` | P8, P13, SCB-09 | 三级导航 + 权限/扫描 |
 | 加密 | `/encryption` | P10, P15, SCB-10 | 列表 + 轮换/seal/unseal |
 | 密钥 | `/secrets`, `/secrets/$id` | P10, P15, SCB-10 | 列表 + 详情 + 绑定 |
@@ -118,7 +118,7 @@
 
 ### 3.3 已知缺口（汇总自 P15 及评审）
 
-- [x] 网络资源 GET 详情（VPC/子网/安全组/LB Drawer；路由无 GET API）
+- [x] 网络资源 GET 详情（VPC/子网/安全组/LB/路由 Drawer）
 - [x] 向量库 GET 详情页（Drawer）
 - [x] Registry 当前已落地边缘 API（创建项目/权限/Pull Secret/扫描查询）已覆盖 mock-server 联调
 - [ ] BareMetal / Notifications / Audit 真实页面（待契约）
