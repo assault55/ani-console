@@ -84,6 +84,14 @@ test.describe('侧栏导航', () => {
     await expect(page.getByRole('link', { name: 'data-vol' })).toBeVisible()
   })
 
+  test('可进入可启动镜像列表', async ({ page }) => {
+    await page.getByText('存储', { exact: true }).click()
+    await page.getByRole('link', { name: '可启动镜像' }).click()
+    await expect(page).toHaveURL(/\/images/)
+    await expect(page.getByRole('heading', { name: '可启动镜像' })).toBeVisible()
+    await expect(page.getByText('ubuntu-24.04.iso')).toBeVisible()
+  })
+
   test('可进入网络管理 VPC', async ({ page }) => {
     await page.getByText('网络管理', { exact: true }).click()
     await page.getByRole('link', { name: 'VPC' }).click()

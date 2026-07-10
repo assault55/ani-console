@@ -26,6 +26,7 @@ import { Route as AuthenticatedObjectsIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedNotificationsIndexRouteImport } from './routes/_authenticated/notifications/index'
 import { Route as AuthenticatedK8sClustersIndexRouteImport } from './routes/_authenticated/k8s-clusters/index'
 import { Route as AuthenticatedInstancesIndexRouteImport } from './routes/_authenticated/instances/index'
+import { Route as AuthenticatedImagesIndexRouteImport } from './routes/_authenticated/images/index'
 import { Route as AuthenticatedGpuInventoryIndexRouteImport } from './routes/_authenticated/gpu-inventory/index'
 import { Route as AuthenticatedFilesystemsIndexRouteImport } from './routes/_authenticated/filesystems/index'
 import { Route as AuthenticatedEncryptionIndexRouteImport } from './routes/_authenticated/encryption/index'
@@ -152,6 +153,12 @@ const AuthenticatedInstancesIndexRoute =
   AuthenticatedInstancesIndexRouteImport.update({
     id: '/instances/',
     path: '/instances/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedImagesIndexRoute =
+  AuthenticatedImagesIndexRouteImport.update({
+    id: '/images/',
+    path: '/images/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedGpuInventoryIndexRoute =
@@ -369,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/encryption/': typeof AuthenticatedEncryptionIndexRoute
   '/filesystems/': typeof AuthenticatedFilesystemsIndexRoute
   '/gpu-inventory/': typeof AuthenticatedGpuInventoryIndexRoute
+  '/images/': typeof AuthenticatedImagesIndexRoute
   '/instances/': typeof AuthenticatedInstancesIndexRoute
   '/k8s-clusters/': typeof AuthenticatedK8sClustersIndexRoute
   '/notifications/': typeof AuthenticatedNotificationsIndexRoute
@@ -417,6 +425,7 @@ export interface FileRoutesByTo {
   '/encryption': typeof AuthenticatedEncryptionIndexRoute
   '/filesystems': typeof AuthenticatedFilesystemsIndexRoute
   '/gpu-inventory': typeof AuthenticatedGpuInventoryIndexRoute
+  '/images': typeof AuthenticatedImagesIndexRoute
   '/instances': typeof AuthenticatedInstancesIndexRoute
   '/k8s-clusters': typeof AuthenticatedK8sClustersIndexRoute
   '/notifications': typeof AuthenticatedNotificationsIndexRoute
@@ -469,6 +478,7 @@ export interface FileRoutesById {
   '/_authenticated/encryption/': typeof AuthenticatedEncryptionIndexRoute
   '/_authenticated/filesystems/': typeof AuthenticatedFilesystemsIndexRoute
   '/_authenticated/gpu-inventory/': typeof AuthenticatedGpuInventoryIndexRoute
+  '/_authenticated/images/': typeof AuthenticatedImagesIndexRoute
   '/_authenticated/instances/': typeof AuthenticatedInstancesIndexRoute
   '/_authenticated/k8s-clusters/': typeof AuthenticatedK8sClustersIndexRoute
   '/_authenticated/notifications/': typeof AuthenticatedNotificationsIndexRoute
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/encryption/'
     | '/filesystems/'
     | '/gpu-inventory/'
+    | '/images/'
     | '/instances/'
     | '/k8s-clusters/'
     | '/notifications/'
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/encryption'
     | '/filesystems'
     | '/gpu-inventory'
+    | '/images'
     | '/instances'
     | '/k8s-clusters'
     | '/notifications'
@@ -620,6 +632,7 @@ export interface FileRouteTypes {
     | '/_authenticated/encryption/'
     | '/_authenticated/filesystems/'
     | '/_authenticated/gpu-inventory/'
+    | '/_authenticated/images/'
     | '/_authenticated/instances/'
     | '/_authenticated/k8s-clusters/'
     | '/_authenticated/notifications/'
@@ -774,6 +787,13 @@ declare module '@tanstack/react-router' {
       path: '/instances'
       fullPath: '/instances/'
       preLoaderRoute: typeof AuthenticatedInstancesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/images/': {
+      id: '/_authenticated/images/'
+      path: '/images'
+      fullPath: '/images/'
+      preLoaderRoute: typeof AuthenticatedImagesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/gpu-inventory/': {
@@ -1118,6 +1138,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEncryptionIndexRoute: typeof AuthenticatedEncryptionIndexRoute
   AuthenticatedFilesystemsIndexRoute: typeof AuthenticatedFilesystemsIndexRoute
   AuthenticatedGpuInventoryIndexRoute: typeof AuthenticatedGpuInventoryIndexRoute
+  AuthenticatedImagesIndexRoute: typeof AuthenticatedImagesIndexRoute
   AuthenticatedInstancesIndexRoute: typeof AuthenticatedInstancesIndexRoute
   AuthenticatedK8sClustersIndexRoute: typeof AuthenticatedK8sClustersIndexRoute
   AuthenticatedNotificationsIndexRoute: typeof AuthenticatedNotificationsIndexRoute
@@ -1161,6 +1182,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEncryptionIndexRoute: AuthenticatedEncryptionIndexRoute,
   AuthenticatedFilesystemsIndexRoute: AuthenticatedFilesystemsIndexRoute,
   AuthenticatedGpuInventoryIndexRoute: AuthenticatedGpuInventoryIndexRoute,
+  AuthenticatedImagesIndexRoute: AuthenticatedImagesIndexRoute,
   AuthenticatedInstancesIndexRoute: AuthenticatedInstancesIndexRoute,
   AuthenticatedK8sClustersIndexRoute: AuthenticatedK8sClustersIndexRoute,
   AuthenticatedNotificationsIndexRoute: AuthenticatedNotificationsIndexRoute,

@@ -330,3 +330,79 @@ npm run verify
 
 - P23 建议：Core 真实 Gateway smoke 分层，把 Mock Server smoke 与 Gateway smoke 拆成独立 Playwright profile。
 - P24 建议：存储与对象上传联调增强，覆盖 `202 + AsyncTask` 轮询路径。
+
+---
+
+## 10. 执行记录：Images / VM ISO 契约同步（2026-07-09）
+
+根目录最新 Core `v1.yaml` 已同步到 `openapi/v1.yaml` 并重新生成 `src/api/core-schema.d.ts`。本轮接入新增 `Images` 组：`/images` 列表、`/images/uploads` 创建上传会话、`/images/{image_id}` 删除；并在 VM 创建表单中新增 `containerDisk / ISO 安装` 启动介质切换，ISO 模式提交 `boot_media.type=iso`、`image_id`、`boot_order=1` 与 `root_disk_size_gib`，不再同时提交 `boot_image`。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `openapi/v1.yaml`、`src/api/core-schema.d.ts` | 同步 Core Images 与 VM boot media 契约 |
+| `src/routes/_authenticated/images/index.tsx` | 新增可启动镜像页面，展示上传会话 URL/token |
+| `src/routes/_authenticated/instances/index.tsx` | VM 创建支持 Ready ISO 选择与空白系统盘大小 |
+| `src/components/shell/SideMenu.tsx`、`src/lib/side-menu-match.ts` | 存储分组新增“可启动镜像”入口 |
+| `e2e/images.spec.ts`、`e2e/instances.spec.ts`、`e2e/navigation.spec.ts` | 覆盖上传会话、VM ISO 提交体与侧栏入口 |
+
+验证：`npm run verify` 通过，包含 codegen、typecheck、unit 68/68、E2E 42/42 与 production build。
+
+---
+
+## 11. 执行记录：ISO 直传 + noVNC 闭环补齐（2026-07-09）
+
+按 `docs/superpowers/specs/2026-07-09-iso-upload-vm-novnc-design.md`，在现有 Images / VM ISO / VNC 骨架上补齐浏览器直传与控制台协议。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `src/lib/image-upload.ts`、`src/lib/image-upload.test.ts` | 新增 helper：`POST /images/uploads`（固定 `format=iso`，不传 `storage_class`）→ 会话 token 直传 `upload_url` → 轮询至 `ready/failed` |
+| `src/routes/_authenticated/images/index.tsx` | 「上传 ISO」选本地文件、进度条、列表轮询；去掉 format/qcow2/raw 与 storage_class 主路径 |
+| `src/components/instances/InstanceVncConsole.tsx` | 默认 `protocol: novnc`；后端错误原文；过期/断开可重新连接；卸载 disconnect |
+| `src/routes/_authenticated/instances/$instanceId.tsx` | 仅 `kind=vm && state=running` 启用「控制台」 |
+| `e2e/images.spec.ts`、`e2e/instances.spec.ts`、`e2e/support/api-mock.ts` | 覆盖直传 Authorization、不传 storage_class、console `novnc` |
+
+验证：`npm run verify` 通过（codegen、typecheck、unit 72、E2E 42、build）。
+本地 noVNC 策略：直接连接后端返回的 `connect_url`（不改写同源代理）。
+
+---
+
+## 12. 执行记录：大 ISO 直传进度/入库修复（2026-07-10）
+
+修复大 ISO（如 openEuler DVD）在浏览器进度到 100% 后误判失败的问题：发送完成 ≠ 镜像 ready。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `src/lib/image-upload.ts` | 直传固定 `Content-Type: application/octet-stream` + `xhr.send(file)`；进度封顶 99%；发送完成后进入 `importing` 并轮询；会话 POST 同步 `Idempotency-Key` 头 |
+| `src/routes/_authenticated/images/index.tsx` | 两段进度文案（上传中 / 上传完成，正在入库…）；`size_gib` 按文件计算，去掉写死 5 |
+| `src/lib/image-upload.test.ts`、`e2e/images.spec.ts` | 覆盖 octet-stream、幂等头、按文件算 size、发送失败 HTTP 原文 |
+
+验证：`npm run verify` 通过。
+
+---
+
+## 13. 执行记录：ISO 上传准备门禁（2026-07-10）
+
+按方案 A 只改前端状态机：创建上传会话后先轮询 `GET /images/{image_id}`，仅当 `state === uploading` 时才开始 `xhr.send(file)`，避免 CDI upload pod / upload-prime 还未就绪时浏览器进度条提前启动。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `src/lib/image-upload.ts` | 新增 `preparing → uploading → processing → ready/failed` 状态机；`preparing` 最多等待 5 分钟；`failed/deleting/deleted` 立即失败 |
+| `src/routes/_authenticated/images/index.tsx` | 文案改为“正在准备存储（等待上传服务就绪）…”、“正在发送文件…”，“发送完成，平台入库中…”；`preparing` 用不确定进度 |
+| `src/lib/image-upload.test.ts` | 新增回归测试：`pending` 阶段禁止调用 `xhr.send`，进入 `uploading` 后才发送原始文件 |
+| `e2e/images.spec.ts` | 上传流程 mock 先返回 `uploading` 门禁，再返回 `ready`，覆盖 UI 准备态 |
+
+验证：`npm run verify` 通过（codegen、typecheck、unit 75/75、E2E 42/42、build）。
+
+---
+
+## 14. 执行记录：ISO 上传 503 重试与真实进度（2026-07-10）
+
+继续按方案 A 只改前端：上传服务门禁通过后再稳定等待 3 秒；直传阶段如果 upload proxy 返回 503，不立即失败，最多重试 6 次，每次等待 5 秒；进度条只使用 `xhr.upload.onprogress` 的 `loaded/total` 字节，不使用定时器或估算。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `src/lib/image-upload.ts` | `state=uploading` 后额外稳定等待；503 退避重试；`ImageUploadProgress` 增加 `loadedBytes/totalBytes` |
+| `src/routes/_authenticated/images/index.tsx` | `preparing/processing` 改为 Spin，不显示百分比；`uploading` 显示真实发送百分比与已传/总量 |
+| `src/lib/image-upload.test.ts` | 覆盖 503 自动重试、同一个 File 原始二进制重发、真实 loaded/total 进度 |
+
+验证：`npm run verify` 通过（codegen、typecheck、unit 76/76、E2E 42/42、build）。

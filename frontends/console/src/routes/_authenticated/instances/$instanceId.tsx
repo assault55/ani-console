@@ -173,6 +173,7 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
 
   const inst = detail.data
   const isVmInstance = inst?.kind === 'vm'
+  const canOpenConsole = isVmInstance && inst?.state === 'running'
 
   return (
     <div className="space-y-5">
@@ -184,6 +185,8 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
             {isVmInstance ? (
               <Button
                 type="primary"
+                disabled={!canOpenConsole}
+                title={canOpenConsole ? undefined : '实例未运行'}
                 onClick={() => openConsoleWindow(instanceId)}
               >
                 控制台

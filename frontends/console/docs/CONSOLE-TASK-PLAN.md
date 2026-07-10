@@ -97,6 +97,7 @@
 | GPU | `/gpu-inventory` | P4 | 列表 + 占用 |
 | Sandbox | `/sandbox-templates` | P4 | CRUD |
 | K8s | `/k8s-clusters` | P9, P14 | 创建/节点池/Proxy/升级 |
+| 可启动镜像 | `/images` | P22 | 列表 + 本地 ISO 直传（upload_url）+ 删除；供 VM ISO 启动 / noVNC 装机 |
 | 块存储 | `/volumes`, `/volumes/$id` | P6, P12 | 列表 + 快照 |
 | 文件存储 | `/filesystems`, `/filesystems/$id` | P6, P12 | 列表 + 挂载目标 |
 | 对象存储 | `/objects` | P6, P12 | 桶/上传/下载/删除 |

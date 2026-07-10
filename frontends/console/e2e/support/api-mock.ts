@@ -124,6 +124,77 @@ const MOCK_ROUTES: MockRoute[] = [
   },
   {
     method: 'GET',
+    pattern: /^\/images$/,
+    body: {
+      items: [
+        {
+          id: 'img-ubuntu-iso',
+          tenant_id: 'tenant-1',
+          name: 'ubuntu-24.04.iso',
+          format: 'iso',
+          size_gib: 8,
+          state: 'ready',
+          storage_class: 'ani-rbd-ssd',
+          created_at: ISO,
+          updated_at: ISO,
+        },
+      ],
+      total: 1,
+    },
+  },
+  {
+    method: 'POST',
+    pattern: /^\/images\/uploads$/,
+    body: {
+      image: {
+        id: 'img-upload-1',
+        tenant_id: 'tenant-1',
+        name: 'new.iso',
+        format: 'iso',
+        size_gib: 10,
+        state: 'uploading',
+        storage_class: 'ani-rbd-ssd',
+        created_at: ISO,
+        updated_at: ISO,
+      },
+      upload_url: 'https://upload.example/images/img-upload-1',
+      token: 'upload-ticket',
+      expires_at: '2099-06-01T08:00:00Z',
+      method: 'POST',
+    },
+  },
+  {
+    method: 'GET',
+    pattern: /^\/images\/([^/]+)$/,
+    body: (match) => ({
+      id: match[1],
+      tenant_id: 'tenant-1',
+      name: match[1] === 'img-upload-1' ? 'new.iso' : 'ubuntu-24.04.iso',
+      format: 'iso',
+      size_gib: 8,
+      state: 'ready',
+      storage_class: 'ani-rbd-ssd',
+      created_at: ISO,
+      updated_at: ISO,
+    }),
+  },
+  {
+    method: 'DELETE',
+    pattern: /^\/images\/[^/]+$/,
+    body: {
+      id: 'img-ubuntu-iso',
+      tenant_id: 'tenant-1',
+      name: 'ubuntu-24.04.iso',
+      format: 'iso',
+      size_gib: 8,
+      state: 'deleting',
+      storage_class: 'ani-rbd-ssd',
+      created_at: ISO,
+      updated_at: ISO,
+    },
+  },
+  {
+    method: 'GET',
     pattern: /^\/volumes$/,
     body: {
       items: [

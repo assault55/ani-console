@@ -194,6 +194,11 @@ export interface paths {
          * 创建实例
          * @description 创建 VM、container、gpu_container 或 sandbox。POST 创建必须携带 idempotency_key；
          *     同一 (tenant_id, idempotency_key) 在 24 小时内返回同一操作结果。
+         *     VM 启动介质：
+         *     - 既有路径：传 boot_image（containerDisk 引用）；
+         *     - ISO 安装路径：传 boot_media.type=iso + boot_media.image_id（须引用 Ready 的 Image），
+         *       并传 root_disk_size_gib（空白系统盘）；boot_image 与 boot_media 互斥。
+         *     ISO 路径下实例 volumes 将包含 root_disk 与 cdrom。
          */
         post: operations["createInstance"];
         delete?: never;
@@ -253,8 +258,33 @@ export interface paths {
         /**
          * 申请 VM console/VNC session
          * @description 返回短期 console/VNC/serial session 信息；不暴露 provider 长期凭据。
+         *     connect_url 指向 Gateway WebSocket 代理，供浏览器 noVNC 直接连接；
+         *     创建 session 时只校验 VMI 可运行，不会对 KubeVirt /vnc 发起普通 HTTP GET。
          */
         post: operations["createInstanceConsoleSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instances/{instance_id}/console/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 连接 VM console/VNC WebSocket
+         * @description 使用 createInstanceConsoleSession 返回的短期一次性 token 建立 WebSocket 连接。
+         *     浏览器 noVNC 应直接连接 connect_url；握手鉴权通过 query 参数 token 完成，不要求也不支持依赖 Authorization header。
+         *     Gateway 将浏览器 WebSocket 二进制帧双向转发到 KubeVirt subresource（vnc/console），
+         *     后端使用 KubeVirt plain stream 子协议 `plain.kubevirt.io`。
+         */
+        get: operations["connectInstanceConsoleSession"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -343,7 +373,12 @@ export interface paths {
          * 连接实例终端 exec WebSocket
          * @description 使用 createInstanceExecSession 返回的短期一次性 token 建立 WebSocket 连接。
          *     浏览器客户端应直接连接 ws_url；握手鉴权通过 query 参数 token 完成，不要求也不支持依赖 Authorization header。
-         *     WebSocket 数据帧协议：普通 text/binary 帧作为 stdin 原始字节透传；stdout/stderr 由后端以 text/binary 原样回传；终端 resize 使用 JSON 控制帧 `{"type":"resize","cols":120,"rows":30}`。
+         *     WebSocket 数据帧协议使用 KubeCloud TerminalMessage JSON 文本帧：
+         *     stdin 输入发送 `{"Op":"stdin","Data":"<typed chars>"}`；
+         *     终端 resize 发送 `{"Op":"resize","Cols":120,"Rows":30}`；
+         *     后端终端可见输出统一发送 `{"Op":"stdout","Data":"<terminal output>"}`；toast 消息可使用 `{"Op":"toast","Data":"<message>"}`。
+         *     在 local profile TTY 模式下，后端会将 stdin 输入回显为 stdout，以匹配浏览器终端交互效果。
+         *     为兼容旧客户端，后端仍接受普通 text/binary 帧作为 stdin 原始字节透传，并接受旧 resize 控制帧 `{"type":"resize","cols":120,"rows":30}`。
          */
         get: operations["connectInstanceExecSession"];
         put?: never;
@@ -1622,6 +1657,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询可启动镜像列表
+         * @description 列出租户下已登记的 ISO/磁盘镜像元数据。
+         *     不返回 CDI DataVolume/PVC 等 provider 对象；客户端只使用 Image.id。
+         */
+        get: operations["listImages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 创建镜像上传会话
+         * @description 为本地 ISO/qcow2/raw 创建上传会话。服务端准备导入目标并返回短期 upload_url 与 token；
+         *     客户端将文件直传至 upload_url（不经 Gateway 请求体中转大文件）。
+         *     POST 必须携带 idempotency_key。本期优先实现 format=iso。
+         *     上传完成后客户端轮询 GET /images/{image_id} 直至 state=ready。
+         */
+        post: operations["createImageUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询镜像详情与导入状态 */
+        get: operations["getImage"];
+        put?: never;
+        post?: never;
+        /**
+         * 删除镜像
+         * @description 删除镜像元数据及底层导入卷。若仍被 Running/Provisioning VM 的 CD-ROM/系统盘引用，返回 409。
+         */
+        delete: operations["deleteImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sandbox-templates": {
         parameters: {
             query?: never;
@@ -2034,7 +2134,7 @@ export interface components {
             volumes?: {
                 name: string;
                 /** @enum {string} */
-                kind: "root_disk" | "data_disk" | "shared_pvc" | "object_fuse" | "ephemeral";
+                kind: "root_disk" | "data_disk" | "cdrom" | "shared_pvc" | "object_fuse" | "ephemeral";
                 /** Format: int64 */
                 size_gib?: number;
                 source_ref?: string | null;
@@ -2161,8 +2261,14 @@ export interface components {
             memory?: string;
             /** @default true */
             auto_start: boolean;
-            /** @description VM boot image 引用 */
+            /** @description VM containerDisk 镜像引用；与 boot_media 互斥。未传 boot_media 时沿用既有 containerDisk 路径。 */
             boot_image?: string | null;
+            boot_media?: components["schemas"]["InstanceBootMedia"];
+            /**
+             * Format: int64
+             * @description VM 空白系统盘大小（GiB）。boot_media.type=iso 时必填（或由服务端默认）；containerDisk 路径可忽略。
+             */
+            root_disk_size_gib?: number | null;
             /**
              * @description VM SSH 用户名；仅 VM 使用
              * @default ubuntu
@@ -2197,6 +2303,107 @@ export interface components {
              */
             replicas: number;
             sandbox_config?: components["schemas"]["SandboxConfig"];
+        };
+        /**
+         * @description VM 启动介质选择。与 boot_image 互斥。
+         *     type=iso：使用已上传且 Ready 的 Image（ISO PVC）作为 CD-ROM，并创建空白 root disk 供安装。
+         *     type=disk_image：预留；使用已上传的 qcow2/raw 作为系统盘（本期可不实现）。
+         *     不暴露 DataVolume、UploadToken、PVC 等 provider 对象。
+         */
+        InstanceBootMedia: {
+            /** @enum {string} */
+            type: "iso" | "disk_image";
+            /** @description POST /images/uploads 返回的 Image.id；type=iso 或 disk_image 时必填。 */
+            image_id?: string;
+            /**
+             * @description ISO CD-ROM 启动顺序；默认 1，优先于空白系统盘。
+             * @default 1
+             */
+            boot_order: number;
+        } | null;
+        /**
+         * @description 上传镜像格式。iso 用于 CD-ROM 安装；qcow2/raw 预留给系统盘直启。
+         * @enum {string}
+         */
+        ImageFormat: "iso" | "qcow2" | "raw";
+        /**
+         * @description 镜像导入状态。uploading=等待/正在上传；processing=导入中；ready=可挂载；failed/deleting/deleted 为终态或删除中。
+         * @enum {string}
+         */
+        ImageState: "pending" | "uploading" | "processing" | "ready" | "failed" | "deleting" | "deleted";
+        /**
+         * @description 租户级可启动介质元数据（ISO/磁盘镜像）。
+         *     底层可由 CDI DataVolume/PVC 承载，但 API 不返回 provider CR 名称以外的实现细节。
+         */
+        Image: {
+            id: string;
+            tenant_id: string;
+            name: string;
+            format: components["schemas"]["ImageFormat"];
+            /**
+             * Format: int64
+             * @description 目标 PVC/DataVolume 容量（GiB），须 ≥ 上传文件展开后大小。
+             */
+            size_gib: number;
+            /** @description 可选 MIME，如 application/x-iso9660-image。 */
+            content_type?: string | null;
+            state: components["schemas"]["ImageState"];
+            reason?: string | null;
+            message?: string | null;
+            /** @description 可选：导入完成后关联的 Core StorageVolume.id（若平台将其登记为卷）。 */
+            volume_id?: string | null;
+            /** @description 使用的存储类；未指定时由平台默认（如 ani-rbd-ssd）。 */
+            storage_class?: string | null;
+            dev_profile?: components["schemas"]["CoreDevProfileInfo"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ImageListResponse: {
+            items: components["schemas"]["Image"][];
+            total: number;
+            next_cursor?: string | null;
+        };
+        /**
+         * @description 创建镜像上传会话。服务端准备导入目标并返回短期 upload_url + token；
+         *     客户端将文件直传至 upload_url，不经 Gateway 请求体中转大文件。
+         */
+        CreateImageUploadRequest: {
+            idempotency_key: string;
+            name: string;
+            format: components["schemas"]["ImageFormat"];
+            /**
+             * Format: int64
+             * @description 目标卷容量 GiB。ISO 建议按文件大小向上取整并留余量。
+             */
+            size_gib: number;
+            /** @description 可选；ISO 可用 application/x-iso9660-image。 */
+            content_type?: string | null;
+            /** @description 可选；默认平台块存储类。 */
+            storage_class?: string | null;
+        };
+        /**
+         * @description 镜像上传会话。客户端使用 upload_url + token 直传文件（HTTP PUT/POST，由实现文档约定）。
+         *     token 为短期一次性票据；过期后须重新创建上传会话。
+         */
+        ImageUploadSession: {
+            image: components["schemas"]["Image"];
+            /**
+             * Format: uri
+             * @description 浏览器/脚本可直达的上传端点（通常为 CDI upload proxy 的平台暴露地址）。
+             */
+            upload_url: string;
+            /** @description 短期上传票据；放入 Authorization: Bearer <token> 或实现约定的 header/query。 */
+            token: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * @description 客户端上传应使用的 HTTP 方法。
+             * @default POST
+             * @enum {string}
+             */
+            method: "PUT" | "POST";
         };
         /**
          * @description Sandbox 出口策略；local profile 仅记录意图，不代表真实网络隔离已执行。
@@ -2384,6 +2591,8 @@ export interface components {
              * @enum {string}
              */
             protocol: "console" | "vnc" | "novnc" | "serial";
+            /** @description 可选；同一 tenant 下复用可返回同一短期 session */
+            idempotency_key?: string;
         };
         InstanceConsoleSession: {
             /** @description 对应 operation timeline，可通过 /instance-operations/{operation_id} 查询 */
@@ -2391,9 +2600,12 @@ export interface components {
             session_id: string;
             /** @enum {string} */
             protocol: "console" | "vnc" | "novnc" | "serial";
+            /** @description 浏览器 noVNC/WebSocket 可直接连接的 URL；必须包含短期一次性 token query 参数，客户端无需也不能依赖 Authorization header 完成握手。 */
             connect_url: string;
             /** @description 连接 URL，和 connect_url 等价，供 Console/SDK 直接使用 */
             url: string;
+            /** @description 短期一次性 WebSocket 握手票据；与 connect_url query 中的 token 相同，供无法直接使用 connect_url 的客户端显式拼接。 */
+            token?: string;
             /** Format: date-time */
             expires_at: string;
         };
@@ -3683,6 +3895,36 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    connectInstanceConsoleSession: {
+        parameters: {
+            query: {
+                /** @description createInstanceConsoleSession 返回的短期一次性 WebSocket token */
+                token: string;
+            };
+            header?: never;
+            path: {
+                instance_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description WebSocket switching protocols */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listInstanceLogs: {
@@ -6374,6 +6616,112 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listImages: {
+        parameters: {
+            query?: {
+                format?: components["schemas"]["ImageFormat"];
+                state?: components["schemas"]["ImageState"];
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 镜像列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createImageUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateImageUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description 上传会话已创建 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadSession"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 镜像详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 镜像已删除或进入 deleting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Image"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listSandboxTemplates: {

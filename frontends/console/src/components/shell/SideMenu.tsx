@@ -36,6 +36,7 @@ const menuItems = [
     label: '存储',
     icon: <IconStorage />,
     children: [
+      { key: '/images', label: '可启动镜像' },
       { key: '/volumes', label: '块存储' },
       { key: '/filesystems', label: '文件存储' },
       { key: '/objects', label: '对象存储' },

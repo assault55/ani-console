@@ -206,10 +206,10 @@ test.describe('实例与算力', () => {
         status: 200,
         json: {
           session_id: 'vnc-session-1',
-          protocol: 'vnc',
+          protocol: 'novnc',
           connect_url: 'ws://vnc.example/instances/inst-vm-1/console/vnc-session-1?token=short-ticket',
           url: 'ws://vnc.example/instances/inst-vm-1/console/vnc-session-1?token=short-ticket',
-          expires_at: '2026-06-01T08:10:00Z',
+          expires_at: '2099-06-01T08:10:00Z',
         },
       })
     })
@@ -222,7 +222,7 @@ test.describe('实例与算力', () => {
     await page.goto('/instances/console/inst-vm-1')
     await expect(page.getByRole('menu')).toHaveCount(0)
     await expect(page.getByTestId('instance-vnc-console')).toBeVisible()
-    await expect.poll(() => consoleBody?.protocol).toBe('vnc')
+    await expect.poll(() => consoleBody?.protocol).toBe('novnc')
   })
 
   test('创建实例时提交所选 VPC 子网和固定 IP', async ({ page }) => {
@@ -313,6 +313,34 @@ test.describe('实例与算力', () => {
       subnet_id: 'subnet-1',
       private_ip: '10.0.1.20',
     })
+  })
+
+  test('创建 VM 实例可选择 Ready ISO 作为启动介质', async ({ page }) => {
+    let createBody: Record<string, unknown> | undefined
+    await page.route('**/api/v1/instances', async (route, request) => {
+      if (request.method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      createBody = request.postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        headers: { Location: '/api/v1/tasks/task-vm-iso' },
+        json: { instance: { id: 'inst-iso', name: 'vm-from-iso', state: 'pending' } },
+      })
+    })
+
+    await page.goto('/instances/vm/create')
+    await page.getByTestId('instance-name-input').fill('vm-from-iso')
+    await page.getByText('ISO 安装').click()
+    await page.getByTestId('instance-iso-image-select').click()
+    await page.getByRole('option', { name: 'ubuntu-24.04.iso' }).click()
+    await page.getByTestId('instance-root-disk-size-input').fill('40')
+    await page.getByRole('button', { name: '创建实例' }).click()
+
+    expect(createBody?.boot_image).toBeNull()
+    expect(createBody?.boot_media).toEqual({ type: 'iso', image_id: 'img-ubuntu-iso', boot_order: 1 })
+    expect(createBody?.root_disk_size_gib).toBe(40)
   })
 
   test('GPU 清单页展示指标', async ({ page }) => {

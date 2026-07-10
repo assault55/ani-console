@@ -25,6 +25,7 @@ type CreateInstanceRequest = components['schemas']['CreateInstanceRequest']
 type InstanceKind = CreateInstanceRequest['kind']
 type NetworkMode = 'default' | 'vpc'
 type IpAllocationMode = 'auto' | 'manual'
+type VmBootMode = 'containerDisk' | 'iso'
 
 const VM_BOOT_IMAGE = 'quay.io/kubevirt/cirros-container-disk-demo:v1.2.0'
 const CONTAINER_IMAGE = 'dockerproxy.net/library/nginx:1.27-alpine'
@@ -37,7 +38,10 @@ type InstanceFormState = {
   cpu: string
   memory: string
   auto_start: boolean
+  boot_mode: VmBootMode
   boot_image: string
+  boot_media_image_id: string
+  root_disk_size_gib: number
   ssh_username: string
   ssh_key_ref: string
   termination_protection: boolean
@@ -58,7 +62,10 @@ type InstanceFormState = {
 const kindDefaults: Record<InstanceKind, Partial<InstanceFormState>> = {
   vm: {
     image: '',
+    boot_mode: 'containerDisk',
     boot_image: VM_BOOT_IMAGE,
+    boot_media_image_id: '',
+    root_disk_size_gib: 40,
     ssh_username: 'cirros',
     cpu: '2',
     memory: '4Gi',
@@ -104,7 +111,10 @@ const defaultInstanceForm: InstanceFormState = {
   cpu: '2',
   memory: '4Gi',
   auto_start: true,
+  boot_mode: 'containerDisk',
   boot_image: '',
+  boot_media_image_id: '',
+  root_disk_size_gib: 40,
   ssh_username: 'cirros',
   ssh_key_ref: '',
   termination_protection: false,
@@ -162,7 +172,19 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
   }
 
   if (form.kind === 'vm') {
-    body.boot_image = optionalTrimmed(form.boot_image) ?? null
+    if (form.boot_mode === 'iso') {
+      body.boot_image = null
+      body.boot_media = {
+        type: 'iso',
+        image_id: form.boot_media_image_id,
+        boot_order: 1,
+      }
+      body.root_disk_size_gib = form.root_disk_size_gib
+    } else {
+      body.boot_image = optionalTrimmed(form.boot_image) ?? null
+      body.boot_media = null
+      body.root_disk_size_gib = null
+    }
     body.ssh_key_ref = optionalTrimmed(form.ssh_key_ref) ?? null
   }
 
@@ -192,6 +214,8 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
 
   return body
 }
+
+export const buildCreateInstanceBodyForTest = buildCreateInstanceBody
 
 function createRouteForKind(kindFilter?: InstanceKind): string | null {
   if (kindFilter === 'container') return '/instances/container/create'
@@ -317,6 +341,14 @@ export function InstanceCreateForm({
     queryKey: ['network-subnets', 'select'],
     queryFn: () => listOrThrow(() => coreApi.GET('/networks/subnets', { params: { query: { limit: 50 } } })),
   })
+  const images = useQuery({
+    queryKey: ['images', 'vm-iso-select'],
+    queryFn: () =>
+      listOrThrow(() =>
+        coreApi.GET('/images', { params: { query: { format: 'iso', state: 'ready', limit: 100 } } }),
+      ),
+    enabled: form.kind === 'vm',
+  })
   const selectedSubnets = (subnets.data?.items ?? []).filter((subnet) => !form.vpc_id || subnet.vpc_id === form.vpc_id)
   const selectedSubnet = selectedSubnets.find((subnet) => String(subnet.id) === form.subnet_id)
   const selectedSubnetCidr = selectedSubnet?.cidr ? String(selectedSubnet.cidr) : ''
@@ -350,6 +382,15 @@ export function InstanceCreateForm({
       if (form.network_mode === 'vpc' && !form.subnet_id) throw new Error('请选择子网')
       if (form.network_mode === 'vpc' && form.ip_allocation === 'manual' && !form.private_ip) throw new Error('请输入固定 IP')
       if (privateIpError) throw new Error(privateIpError)
+      if (form.kind === 'vm' && form.boot_mode === 'containerDisk' && !optionalTrimmed(form.boot_image)) {
+        throw new Error('请输入 Boot Image')
+      }
+      if (form.kind === 'vm' && form.boot_mode === 'iso' && !form.boot_media_image_id) {
+        throw new Error('请选择 ISO 镜像')
+      }
+      if (form.kind === 'vm' && form.boot_mode === 'iso' && form.root_disk_size_gib < 1) {
+        throw new Error('系统盘大小必须大于 0')
+      }
       const { error, response } = await coreApi.POST('/instances', { body: buildCreateInstanceBody(form) })
       if (error) throw error
       const loc = response.headers.get('Location')
@@ -483,13 +524,53 @@ export function InstanceCreateForm({
       ) : null}
       {form.kind === 'vm' ? (
         <>
-          <Form.Item label="Boot Image" required>
-            <Input
-              value={form.boot_image}
-              onChange={(v) => setForm((f) => ({ ...f, boot_image: v }))}
-              placeholder={VM_BOOT_IMAGE}
-            />
+          <Form.Item label="启动介质">
+            <Radio.Group
+              type="button"
+              value={form.boot_mode}
+              onChange={(v) => setForm((f) => ({ ...f, boot_mode: v }))}
+            >
+              <Radio value="containerDisk">ContainerDisk</Radio>
+              <Radio value="iso">ISO 安装</Radio>
+            </Radio.Group>
           </Form.Item>
+          {form.boot_mode === 'containerDisk' ? (
+            <Form.Item label="Boot Image" required>
+              <Input
+                value={form.boot_image}
+                onChange={(v) => setForm((f) => ({ ...f, boot_image: v }))}
+                placeholder={VM_BOOT_IMAGE}
+              />
+            </Form.Item>
+          ) : (
+            <>
+              <Form.Item label="ISO 镜像" required>
+                <Select
+                  data-testid="instance-iso-image-select"
+                  value={form.boot_media_image_id}
+                  onChange={(v) => setForm((f) => ({ ...f, boot_media_image_id: v }))}
+                  loading={images.isLoading}
+                  placeholder="选择 Ready 状态 ISO"
+                  allowClear
+                >
+                  {(images.data?.items ?? []).map((image) => (
+                    <Select.Option key={String(image.id)} value={String(image.id)}>
+                      {String(image.name ?? image.id)}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="系统盘大小 GiB" required>
+                <InputNumber
+                  data-testid="instance-root-disk-size-input"
+                  value={form.root_disk_size_gib}
+                  min={1}
+                  precision={0}
+                  onChange={(v) => setForm((f) => ({ ...f, root_disk_size_gib: Number(v ?? 1) }))}
+                />
+              </Form.Item>
+            </>
+          )}
           <Form.Item label="SSH 用户名">
             <Input value={form.ssh_username} onChange={(v) => setForm((f) => ({ ...f, ssh_username: v }))} />
           </Form.Item>
