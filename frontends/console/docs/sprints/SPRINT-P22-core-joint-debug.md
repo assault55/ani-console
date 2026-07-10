@@ -380,6 +380,21 @@ npm run verify
 
 ---
 
+## 15. 执行记录：集群部署 Console + Gateway（2026-07-10）
+
+将 ISO 直传 / noVNC 前端与 Gateway 流式上传修复部署到 isolated 集群。
+
+| 项 | 值 |
+|----|----|
+| Console 镜像 | `docker.changqingyun.cn/ani/ani-console:dev-iso-20260710-180417` |
+| Gateway 镜像 | `docker.changqingyun.cn/ani/ani-gateway:dev-iso-20260710-180415` |
+| design 提交 | `27d42e8`（已 push `ANI-design` master） |
+| ANI 提交 | `153a336`（已 push `ANI` main，含 OOM 修复与 rootdisk bootOrder） |
+
+验证：`ani-console` / `ani-gateway` rollout 成功；Gateway `/readyz` 与 Console NodePort `30081` 可达。
+
+---
+
 ## 13. 执行记录：ISO 上传准备门禁（2026-07-10）
 
 按方案 A 只改前端状态机：创建上传会话后先轮询 `GET /images/{image_id}`，仅当 `state === uploading` 时才开始 `xhr.send(file)`，避免 CDI upload pod / upload-prime 还未就绪时浏览器进度条提前启动。
