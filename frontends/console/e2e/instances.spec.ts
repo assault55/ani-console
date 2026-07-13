@@ -225,6 +225,70 @@ test.describe('实例与算力', () => {
     await expect.poll(() => consoleBody?.protocol).toBe('novnc')
   })
 
+  test('VM 和容器实例详情按运行状态禁用启动停止按钮', async ({ page }) => {
+    await page.goto('/instances/container/inst-1')
+    await expect(page.getByRole('heading', { name: 'e2e-vm' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '启动' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '停止' })).toBeEnabled()
+
+    await page.route('**/api/v1/instances/inst-container-stopped', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-container-stopped',
+          name: 'stopped-container',
+          state: 'stopped',
+          kind: 'container',
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+    await page.goto('/instances/container/inst-container-stopped')
+    await expect(page.getByRole('heading', { name: 'stopped-container' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '启动' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '停止' })).toBeDisabled()
+
+    await page.route('**/api/v1/instances/inst-vm-running', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-vm-running',
+          name: 'running-vm',
+          state: 'running',
+          kind: 'vm',
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+    await page.goto('/instances/vm/inst-vm-running')
+    await expect(page.getByRole('heading', { name: 'running-vm' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '启动' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '停止' })).toBeEnabled()
+
+    await page.route('**/api/v1/instances/inst-vm-stopped', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-vm-stopped',
+          name: 'stopped-vm',
+          state: 'stopped',
+          kind: 'vm',
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+    await page.goto('/instances/vm/inst-vm-stopped')
+    await expect(page.getByRole('heading', { name: 'stopped-vm' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '启动' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '停止' })).toBeDisabled()
+  })
+
   test('创建实例时提交所选 VPC 子网和固定 IP', async ({ page }) => {
     let createBody: Record<string, unknown> | undefined
     await page.route('**/api/v1/instances', async (route, request) => {

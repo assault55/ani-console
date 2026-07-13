@@ -173,6 +173,9 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
 
   const inst = detail.data
   const isVmInstance = inst?.kind === 'vm'
+  const isRunning = inst?.state === 'running'
+  const canStart = !isRunning
+  const canStop = isRunning
   const canOpenConsole = isVmInstance && inst?.state === 'running'
 
   return (
@@ -195,10 +198,10 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
             <Button type="outline" onClick={() => openTerminalWindow(instanceId)}>
               终端
             </Button>
-            <Button type="outline" onClick={() => lifecycle.mutateAsync('start')}>
+            <Button type="outline" disabled={!canStart} title={canStart ? undefined : '实例正在运行'} onClick={() => lifecycle.mutateAsync('start')}>
               启动
             </Button>
-            <Button type="outline" onClick={() => lifecycle.mutateAsync('stop')}>
+            <Button type="outline" disabled={!canStop} title={canStop ? undefined : '实例未运行'} onClick={() => lifecycle.mutateAsync('stop')}>
               停止
             </Button>
             <Button type="outline" status="danger" onClick={confirmDelete}>

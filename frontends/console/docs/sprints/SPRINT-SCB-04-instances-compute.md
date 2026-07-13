@@ -443,3 +443,22 @@ npm run test:unit -- src/components/instances/InstanceLogsPanel.test.tsx
 ```
 
 补充修正：`follow=true` 实时日志接口仍要求 `Authorization: Bearer <access_token>`；浏览器原生 `EventSource` 无法设置该 header，会导致 Core 侧 tenant 解析为空并返回 401。实时日志现改为 `fetch` streaming，请求头显式携带当前登录 access token，通过 `response.body.getReader()` 解析 `text/event-stream` 的 `event: log` / `data: ...` 并追加日志；组件卸载、停止实时、实例或 level 变化时通过 `AbortController` 取消旧请求。
+
+---
+
+## 24. 实例详情生命周期按钮状态互斥（2026-07-13）
+
+实例详情页按 `state` 互斥禁用生命周期按钮：`running` 时“启动”不可点击、“停止”可点击；非 `running` 时“启动”可点击、“停止”不可点击。覆盖 VM 与容器实例详情路由，避免重复启动运行中实例或停止非运行实例。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/$instanceId.tsx` | 根据实例 `state` 设置“启动 / 停止”按钮 `disabled` 与提示文案 |
+| `e2e/instances.spec.ts` | 新增 VM、容器 running/stopped 生命周期按钮互斥 E2E |
+
+验收：
+
+```bash
+npx playwright test e2e/instances.spec.ts -g 'VM 和容器实例详情按运行状态禁用启动停止按钮'
+npm run typecheck
+npx playwright test e2e/instances.spec.ts
+```
