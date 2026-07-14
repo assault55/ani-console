@@ -55,6 +55,7 @@ import { Route as AuthenticatedObjectsBucketIdObjectIdRouteImport } from './rout
 import { Route as AuthenticatedInstancesVmCreateRouteImport } from './routes/_authenticated/instances/vm/create'
 import { Route as AuthenticatedInstancesVmInstanceIdRouteImport } from './routes/_authenticated/instances/vm/$instanceId'
 import { Route as AuthenticatedInstancesSandboxCreateRouteImport } from './routes/_authenticated/instances/sandbox/create'
+import { Route as AuthenticatedInstancesSandboxInstanceIdRouteImport } from './routes/_authenticated/instances/sandbox/$instanceId'
 import { Route as AuthenticatedInstancesGpuCreateRouteImport } from './routes/_authenticated/instances/gpu/create'
 import { Route as AuthenticatedInstancesContainerCreateRouteImport } from './routes/_authenticated/instances/container/create'
 import { Route as AuthenticatedInstancesContainerInstanceIdRouteImport } from './routes/_authenticated/instances/container/$instanceId'
@@ -328,6 +329,12 @@ const AuthenticatedInstancesSandboxCreateRoute =
     path: '/create',
     getParentRoute: () => AuthenticatedInstancesSandboxRoute,
   } as any)
+const AuthenticatedInstancesSandboxInstanceIdRoute =
+  AuthenticatedInstancesSandboxInstanceIdRouteImport.update({
+    id: '/$instanceId',
+    path: '/$instanceId',
+    getParentRoute: () => AuthenticatedInstancesSandboxRoute,
+  } as any)
 const AuthenticatedInstancesGpuCreateRoute =
   AuthenticatedInstancesGpuCreateRouteImport.update({
     id: '/create',
@@ -393,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/instances/container/$instanceId': typeof AuthenticatedInstancesContainerInstanceIdRoute
   '/instances/container/create': typeof AuthenticatedInstancesContainerCreateRoute
   '/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
+  '/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
   '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
   '/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
@@ -442,6 +450,7 @@ export interface FileRoutesByTo {
   '/instances/container/$instanceId': typeof AuthenticatedInstancesContainerInstanceIdRoute
   '/instances/container/create': typeof AuthenticatedInstancesContainerCreateRoute
   '/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
+  '/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
   '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
   '/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
@@ -495,6 +504,7 @@ export interface FileRoutesById {
   '/_authenticated/instances/container/$instanceId': typeof AuthenticatedInstancesContainerInstanceIdRoute
   '/_authenticated/instances/container/create': typeof AuthenticatedInstancesContainerCreateRoute
   '/_authenticated/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
+  '/_authenticated/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/_authenticated/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
   '/_authenticated/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
   '/_authenticated/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
@@ -548,6 +558,7 @@ export interface FileRouteTypes {
     | '/instances/container/$instanceId'
     | '/instances/container/create'
     | '/instances/gpu/create'
+    | '/instances/sandbox/$instanceId'
     | '/instances/sandbox/create'
     | '/instances/vm/$instanceId'
     | '/instances/vm/create'
@@ -597,6 +608,7 @@ export interface FileRouteTypes {
     | '/instances/container/$instanceId'
     | '/instances/container/create'
     | '/instances/gpu/create'
+    | '/instances/sandbox/$instanceId'
     | '/instances/sandbox/create'
     | '/instances/vm/$instanceId'
     | '/instances/vm/create'
@@ -649,6 +661,7 @@ export interface FileRouteTypes {
     | '/_authenticated/instances/container/$instanceId'
     | '/_authenticated/instances/container/create'
     | '/_authenticated/instances/gpu/create'
+    | '/_authenticated/instances/sandbox/$instanceId'
     | '/_authenticated/instances/sandbox/create'
     | '/_authenticated/instances/vm/$instanceId'
     | '/_authenticated/instances/vm/create'
@@ -992,6 +1005,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInstancesSandboxCreateRouteImport
       parentRoute: typeof AuthenticatedInstancesSandboxRoute
     }
+    '/_authenticated/instances/sandbox/$instanceId': {
+      id: '/_authenticated/instances/sandbox/$instanceId'
+      path: '/$instanceId'
+      fullPath: '/instances/sandbox/$instanceId'
+      preLoaderRoute: typeof AuthenticatedInstancesSandboxInstanceIdRouteImport
+      parentRoute: typeof AuthenticatedInstancesSandboxRoute
+    }
     '/_authenticated/instances/gpu/create': {
       id: '/_authenticated/instances/gpu/create'
       path: '/create'
@@ -1071,11 +1091,14 @@ const AuthenticatedInstancesGpuRouteWithChildren =
   )
 
 interface AuthenticatedInstancesSandboxRouteChildren {
+  AuthenticatedInstancesSandboxInstanceIdRoute: typeof AuthenticatedInstancesSandboxInstanceIdRoute
   AuthenticatedInstancesSandboxCreateRoute: typeof AuthenticatedInstancesSandboxCreateRoute
 }
 
 const AuthenticatedInstancesSandboxRouteChildren: AuthenticatedInstancesSandboxRouteChildren =
   {
+    AuthenticatedInstancesSandboxInstanceIdRoute:
+      AuthenticatedInstancesSandboxInstanceIdRoute,
     AuthenticatedInstancesSandboxCreateRoute:
       AuthenticatedInstancesSandboxCreateRoute,
   }

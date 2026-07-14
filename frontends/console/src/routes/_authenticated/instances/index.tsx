@@ -8,12 +8,12 @@ import { PageHeader } from '@/components/shell/AppShell'
 import { CursorTable } from '@/components/tables/CursorTable'
 import { StatusTag } from '@/components/shell/StatusTag'
 import { formatDateTime } from '@/lib/format'
-import { showApiError } from '@/api/helpers'
 import { AsyncTaskPoller } from '@/components/feedback/AsyncTaskPoller'
 import { Ipv4CidrInput } from '@/components/forms/Ipv4CidrInput'
 import { listOrThrow } from '@/lib/api-list'
 import { optionalIpv4WithinCidrError, subnetFixedOctets, suggestGatewayIp } from '@/lib/validators'
 import { getInstanceDisplayIp, getInstanceNetworkValue } from '@/lib/instance-network'
+import { getInstanceActionErrorMessage, parseSandboxCommand } from '@/lib/sandbox-instance'
 import type { components } from '@/api/core-schema'
 
 export const Route = createFileRoute('/_authenticated/instances/')({
@@ -29,12 +29,14 @@ type VmBootMode = 'containerDisk' | 'iso'
 
 const VM_BOOT_IMAGE = 'quay.io/kubevirt/cirros-container-disk-demo:v1.2.0'
 const CONTAINER_IMAGE = 'dockerproxy.net/library/nginx:1.27-alpine'
+const SANDBOX_IMAGE = 'docker.changqingyun.cn/mirror/busybox:latest'
 const INSTANCE_LIST_POLL_MS = 5000
 
 type InstanceFormState = {
   name: string
   kind: InstanceKind
   image: string
+  command: string
   cpu: string
   memory: string
   auto_start: boolean
@@ -89,7 +91,8 @@ const kindDefaults: Record<InstanceKind, Partial<InstanceFormState>> = {
     replicas: 1,
   },
   sandbox: {
-    image: '',
+    image: SANDBOX_IMAGE,
+    command: 'sh -c "uname -a; sleep 300"',
     boot_image: '',
     sandbox_runtime_class: 'sandbox-kata',
     sandbox_session_timeout: '30m',
@@ -108,6 +111,7 @@ const defaultInstanceForm: InstanceFormState = {
   name: '',
   kind: 'container',
   image: CONTAINER_IMAGE,
+  command: '',
   cpu: '2',
   memory: '4Gi',
   auto_start: true,
@@ -153,9 +157,9 @@ function optionalTrimmed(value: string) {
   return trimmed ? trimmed : undefined
 }
 
-function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest {
+function buildCreateInstanceBody(form: InstanceFormState, idempotencyKey = newIdempotencyKey()): CreateInstanceRequest {
   const body: CreateInstanceRequest = {
-    idempotency_key: newIdempotencyKey(),
+    idempotency_key: idempotencyKey,
     name: form.name.trim(),
     kind: form.kind,
     instance_type: form.kind,
@@ -167,7 +171,7 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
     replicas: form.replicas,
   }
 
-  if (form.kind === 'container' || form.kind === 'gpu_container') {
+  if (form.kind === 'container' || form.kind === 'gpu_container' || form.kind === 'sandbox') {
     body.image = optionalTrimmed(form.image) ?? null
   }
 
@@ -197,6 +201,7 @@ function buildCreateInstanceBody(form: InstanceFormState): CreateInstanceRequest
   }
 
   if (form.kind === 'sandbox') {
+    body.command = parseSandboxCommand(form.command) ?? null
     body.sandbox_config = {
       runtime_class: form.sandbox_runtime_class,
       session_timeout: form.sandbox_session_timeout,
@@ -234,8 +239,9 @@ export function InstancesListPage(props: InstancesListPageProps = {}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['instances', kindFilter ?? 'all'],
     queryFn: async () => {
-      const listKind = kindFilter === 'sandbox' ? undefined : kindFilter
-      const { data, error } = await coreApi.GET('/instances', { params: { query: { limit: 50, kind: listKind } } })
+      // Core accepts kind=sandbox for the real Sandbox list flow; generated query enum is still narrower.
+      const listQuery = { limit: 50, kind: kindFilter } as never
+      const { data, error } = await coreApi.GET('/instances', { params: { query: listQuery } })
       if (error) throw error
       return data
     },
@@ -278,6 +284,8 @@ export function InstancesListPage(props: InstancesListPageProps = {}) {
                     ? '/instances/container/$instanceId'
                     : kindFilter === 'vm'
                       ? '/instances/vm/$instanceId'
+                      : kindFilter === 'sandbox'
+                        ? '/instances/sandbox/$instanceId'
                       : '/instances/$instanceId'
                 }
                 params={{ instanceId: r.id }}
@@ -310,7 +318,7 @@ export function InstancesListPage(props: InstancesListPageProps = {}) {
           kindFilter={kindFilter}
           lockKind={lockKind}
           onCancel={() => setVisible(false)}
-          onCreated={(createdTaskId) => {
+          onCreated={({ taskId: createdTaskId }) => {
             setVisible(false)
             if (createdTaskId) setTaskId(createdTaskId)
           }}
@@ -329,10 +337,11 @@ export function InstanceCreateForm({
   kindFilter?: InstanceKind
   lockKind?: boolean
   onCancel: () => void
-  onCreated: (taskId?: string) => void
+  onCreated: (result: { taskId?: string; instanceId?: string }) => void
 }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<InstanceFormState>(createDefaultForm(kindFilter))
+  const [createIdempotencyKey, setCreateIdempotencyKey] = useState(() => newIdempotencyKey())
   const vpcs = useQuery({
     queryKey: ['network-vpcs', 'select'],
     queryFn: () => listOrThrow(() => coreApi.GET('/networks/vpcs', { params: { query: { limit: 50 } } })),
@@ -379,6 +388,7 @@ export function InstanceCreateForm({
 
   const create = useMutation({
     mutationFn: async () => {
+      if (form.kind === 'sandbox' && !optionalTrimmed(form.image)) throw new Error('请输入镜像')
       if (form.network_mode === 'vpc' && !form.subnet_id) throw new Error('请选择子网')
       if (form.network_mode === 'vpc' && form.ip_allocation === 'manual' && !form.private_ip) throw new Error('请输入固定 IP')
       if (privateIpError) throw new Error(privateIpError)
@@ -391,19 +401,25 @@ export function InstanceCreateForm({
       if (form.kind === 'vm' && form.boot_mode === 'iso' && form.root_disk_size_gib < 1) {
         throw new Error('系统盘大小必须大于 0')
       }
-      const { error, response } = await coreApi.POST('/instances', { body: buildCreateInstanceBody(form) })
-      if (error) throw error
+      const { data, error, response } = await coreApi.POST('/instances', { body: buildCreateInstanceBody(form, createIdempotencyKey) })
+      if (error) throw { ...(typeof error === 'object' && error ? error : { message: String(error) }), status: response.status }
       const loc = response.headers.get('Location')
-      return loc?.match(/tasks\/([^/]+)/)?.[1]
+      return { taskId: loc?.match(/tasks\/([^/]+)/)?.[1] ?? data?.operation_id, instanceId: data?.instance?.id }
     },
-    onSuccess: (createdTaskId) => {
+    onSuccess: (result) => {
       Message.success('实例创建已提交')
       setForm(createDefaultForm(kindFilter))
+      setCreateIdempotencyKey(newIdempotencyKey())
       qc.invalidateQueries({ queryKey: ['instances'] })
-      onCreated(createdTaskId)
+      onCreated(result)
     },
-    onError: (e) => showApiError(e),
+    onError: (e) => Message.error(getInstanceActionErrorMessage(e, 'create')),
   })
+
+  const handleCancel = () => {
+    setCreateIdempotencyKey(newIdempotencyKey())
+    onCancel()
+  }
 
   return (
     <Form layout="vertical">
@@ -507,19 +523,26 @@ export function InstanceCreateForm({
       <Form.Item label="内存">
         <Input value={form.memory} onChange={(v) => setForm((f) => ({ ...f, memory: v }))} placeholder="4Gi" />
       </Form.Item>
-      {(form.kind === 'container' || form.kind === 'gpu_container') ? (
+      {(form.kind === 'container' || form.kind === 'gpu_container' || form.kind === 'sandbox') ? (
         <>
           <Form.Item label="镜像" required>
-            <Input value={form.image} onChange={(v) => setForm((f) => ({ ...f, image: v }))} placeholder={CONTAINER_IMAGE} />
-          </Form.Item>
-          <Form.Item label="副本数">
-            <InputNumber
-              value={form.replicas}
-              min={1}
-              precision={0}
-              onChange={(v) => setForm((f) => ({ ...f, replicas: Number(v ?? 1) }))}
+            <Input
+              data-testid="instance-image-input"
+              value={form.image}
+              onChange={(v) => setForm((f) => ({ ...f, image: v }))}
+              placeholder={form.kind === 'sandbox' ? SANDBOX_IMAGE : CONTAINER_IMAGE}
             />
           </Form.Item>
+          {form.kind !== 'sandbox' ? (
+            <Form.Item label="副本数">
+              <InputNumber
+                value={form.replicas}
+                min={1}
+                precision={0}
+                onChange={(v) => setForm((f) => ({ ...f, replicas: Number(v ?? 1) }))}
+              />
+            </Form.Item>
+          ) : null}
         </>
       ) : null}
       {form.kind === 'vm' ? (
@@ -602,18 +625,34 @@ export function InstanceCreateForm({
           <Form.Item label="Runtime Class" required>
             <Input
               value={form.sandbox_runtime_class}
-              onChange={(v) => setForm((f) => ({ ...f, sandbox_runtime_class: v }))}
+              readOnly
+              disabled
+            />
+          </Form.Item>
+          <Form.Item label="启动命令">
+            <Input.TextArea
+              data-testid="sandbox-command-input"
+              value={form.command}
+              onChange={(v) => setForm((f) => ({ ...f, command: v }))}
+              placeholder={'sh -c "uname -a; sleep 300"'}
+              autoSize={{ minRows: 2, maxRows: 4 }}
             />
           </Form.Item>
           <Form.Item label="Session Timeout" required>
-            <Input
+            <Select
+              data-testid="sandbox-session-timeout-select"
               value={form.sandbox_session_timeout}
               onChange={(v) => setForm((f) => ({ ...f, sandbox_session_timeout: v }))}
-              placeholder="30m"
-            />
+            >
+              <Select.Option value="15m">15m</Select.Option>
+              <Select.Option value="30m">30m</Select.Option>
+              <Select.Option value="1h">1h</Select.Option>
+              <Select.Option value="2h">2h</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item label="网络出口策略">
             <Select
+              data-testid="sandbox-egress-policy-select"
               value={form.sandbox_network_egress_policy}
               onChange={(v) => setForm((f) => ({ ...f, sandbox_network_egress_policy: v }))}
             >
@@ -634,7 +673,7 @@ export function InstanceCreateForm({
         />
       </Form.Item>
       <div className="flex justify-end gap-2">
-        <Button onClick={onCancel}>取消</Button>
+        <Button onClick={handleCancel}>取消</Button>
         <Button type="primary" loading={create.isPending} onClick={() => create.mutateAsync()}>
           创建实例
         </Button>

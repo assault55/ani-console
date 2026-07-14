@@ -38,6 +38,7 @@
 | P19 | [SPRINT-P19-e2e-coverage.md](./sprints/SPRINT-P19-e2e-coverage.md) | ✅ 完成 |
 | P20 | [SPRINT-P20-mock-server-smoke.md](./sprints/SPRINT-P20-mock-server-smoke.md) | ✅ 完成（扩展至 11 smoke） |
 | P21 | [SPRINT-P21-bundle-optimization.md](./sprints/SPRINT-P21-bundle-optimization.md) | ✅ 完成 |
+| P23 | [SPRINT-P23-sandbox-real-instances.md](./sprints/SPRINT-P23-sandbox-real-instances.md) | ✅ 完成 |
 
 **统一验收命令**（P11 起）：`npm run verify`（codegen + tsc + **单元测试** + **E2E** + build）
 
@@ -113,5 +114,6 @@
 | P19 | E2E 按模块补全 | ✅ 完成 |
 | P20 | Mock Server 联调 E2E（可选） | ✅ 完成（扩展至 11 smoke） |
 | P21 | 性能与分包 | ✅ 完成 |
+| P23 | Sandbox 真实实例接入 | ✅ 完成 |
 
 完整说明：[CONSOLE-TASK-PLAN.md](./CONSOLE-TASK-PLAN.md) §2.2

@@ -20,9 +20,9 @@ import { StatusTag } from '@/components/shell/StatusTag'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import { InstanceLogsPanel } from '@/components/instances/InstanceLogsPanel'
 import { formatDateTime } from '@/lib/format'
-import { showApiError } from '@/api/helpers'
 import { newIdempotencyKey } from '@/lib/idempotency'
 import { getInstanceDisplayIp, getInstanceNetworkValue } from '@/lib/instance-network'
+import { getInstanceActionErrorMessage, getSandboxProviderLabel } from '@/lib/sandbox-instance'
 
 export const Route = createFileRoute('/_authenticated/instances/$instanceId')({
   component: InstanceDetailPage,
@@ -130,11 +130,11 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
 
   const lifecycle = useMutation({
     mutationFn: async (action: 'start' | 'stop' | 'restart' | 'delete') => {
-      const { error } = await coreApi.POST('/instances/{instance_id}/lifecycle', {
+      const { error, response } = await coreApi.POST('/instances/{instance_id}/lifecycle', {
         params: { path: { instance_id: instanceId } },
         body: { action, idempotency_key: newIdempotencyKey() },
       })
-      if (error) throw error
+      if (error) throw { ...(typeof error === 'object' && error ? error : { message: String(error) }), status: response.status }
       return action
     },
     onSuccess: (action) => {
@@ -146,7 +146,7 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
       }
       qc.invalidateQueries({ queryKey: ['instance', instanceId] })
     },
-    onError: (e) => showApiError(e),
+    onError: (e) => Message.error(getInstanceActionErrorMessage(e, 'lifecycle')),
   })
 
   const confirmDelete = () => {
@@ -177,6 +177,8 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
   const canStart = !isRunning
   const canStop = isRunning
   const canOpenConsole = isVmInstance && inst?.state === 'running'
+  const isSandboxInstance = inst?.kind === 'sandbox'
+  const sandbox = inst?.sandbox
 
   return (
     <div className="space-y-5">
@@ -235,17 +237,37 @@ export function InstanceDetailContent({ instanceId, returnTo }: { instanceId: st
         }}
       >
         <Tabs.TabPane key="overview" title="概览">
-          <Descriptions
-            column={1}
-            data={[
-              { label: '节点', value: inst?.node_name ?? '—' },
-              { label: 'VPC', value: getInstanceNetworkValue(inst, 'vpc_id') },
-              { label: '子网', value: getInstanceNetworkValue(inst, 'subnet_id') },
-              { label: '内网 IP', value: getInstanceDisplayIp(inst) },
-              { label: '终止保护', value: inst?.termination_protection ? '已开启' : '未开启' },
-              { label: '状态说明', value: inst?.state_message ?? '—' },
-            ]}
-          />
+          <div className="space-y-4">
+            <Descriptions
+              column={1}
+              data={[
+                { label: '节点', value: inst?.node_name ?? '—' },
+                { label: 'VPC', value: getInstanceNetworkValue(inst, 'vpc_id') },
+                { label: '子网', value: getInstanceNetworkValue(inst, 'subnet_id') },
+                { label: '内网 IP', value: getInstanceDisplayIp(inst) },
+                { label: '终止保护', value: inst?.termination_protection ? '已开启' : '未开启' },
+                { label: '状态说明', value: inst?.state_message ?? '—' },
+              ]}
+            />
+            {isSandboxInstance ? (
+              <Descriptions
+                title="Sandbox"
+                column={1}
+                data={[
+                  { label: 'Runtime Class', value: sandbox?.runtime_class ?? '—' },
+                  { label: 'Session State', value: sandbox?.session_state ?? '—' },
+                  { label: 'Session Timeout', value: sandbox?.session_timeout ?? '—' },
+                  { label: 'Egress Policy', value: sandbox?.network_egress_policy ?? '—' },
+                  { label: 'Provider 状态', value: getSandboxProviderLabel(inst ?? {}) },
+                  { label: 'Provider', value: inst?.provider ?? '—' },
+                  { label: 'Dev Profile Mode', value: inst?.dev_profile?.mode ?? sandbox?.dev_profile?.mode ?? '—' },
+                  { label: 'Dev Profile Provider', value: inst?.dev_profile?.provider ?? sandbox?.dev_profile?.provider ?? '—' },
+                  { label: 'Real Provider', value: String(inst?.dev_profile?.real_provider ?? sandbox?.dev_profile?.real_provider ?? false) },
+                  { label: 'Resource refs', value: inst?.resource_refs?.length ? inst.resource_refs.join('，') : '—' },
+                ]}
+              />
+            ) : null}
+          </div>
         </Tabs.TabPane>
         <Tabs.TabPane key="logs" title="日志">
           <InstanceLogsPanel instanceId={instanceId} active={activeTab === 'logs'} />

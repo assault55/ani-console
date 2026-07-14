@@ -26,7 +26,9 @@ function SandboxInstanceCreatePage() {
           kindFilter="sandbox"
           lockKind
           onCancel={() => navigate({ to: '/instances/sandbox' })}
-          onCreated={() => navigate({ to: '/instances/sandbox' })}
+          onCreated={({ instanceId }) =>
+            navigate(instanceId ? { to: '/instances/sandbox/$instanceId', params: { instanceId } } : { to: '/instances/sandbox' })
+          }
         />
       </Card>
     </div>

@@ -48,7 +48,7 @@
 | P16 | Playwright E2E | ✅ | [SPRINT-P16](./sprints/SPRINT-P16-e2e-playwright.md) |
 | P17 | 单元测试 + 测试规范 | ✅ | [SPRINT-P17](./sprints/SPRINT-P17-unit-tests-policy.md) |
 
-**当前门禁**：`cd frontends/console && npm run verify` → 24 unit + 22 e2e + build
+**当前门禁**：`cd frontends/console && npm run verify` → 80 unit + 45 e2e + build
 
 ### 2.2 待办（P18+）
 
@@ -58,6 +58,7 @@
 | P19 | E2E 按模块补全 | ✅ | 新增 API Key / Sandbox 模块 E2E，覆盖提升至 22 条 |
 | P20 | Mock Server 联调 E2E（可选） | ✅ | 新增 `test:e2e:mock-server`，对 `127.0.0.1:4010` 执行 smoke |
 | P21 | 性能与分包 | ✅ | 启用路由自动分包 + ECharts core 按需注册，build 大包告警已消除 |
+| P23 | Sandbox 真实实例接入 | ✅ | `kind=sandbox` 创建、列表过滤、详情 Provider/Sandbox 状态展示 |
 
 > 启动任一阶段时：复制 [SPRINT-TEMPLATE](./sprints/SPRINT-TEMPLATE.md) → 填写 → 将上表状态改为「进行中」。
 
@@ -95,7 +96,7 @@
 | 设置 | `/settings`, `/settings/api-keys` | P2 | 基础 |
 | 实例 | `/instances`, `/instances/$id`, operations | P4, P15 | 列表/详情/操作链 |
 | GPU | `/gpu-inventory` | P4 | 列表 + 占用 |
-| Sandbox | `/sandbox-templates` | P4 | CRUD |
+| Sandbox | `/instances/sandbox`, `/instances/sandbox/$id`, `/sandbox-templates` | P4, P23 | 真实 `kind=sandbox` 创建/列表/详情 + 模板 CRUD |
 | K8s | `/k8s-clusters` | P9, P14 | 创建/节点池/Proxy/升级 |
 | 可启动镜像 | `/images` | P22 | 列表 + 本地 ISO 直传（upload_url）+ 删除；供 VM ISO 启动 / noVNC 装机 |
 | 块存储 | `/volumes`, `/volumes/$id` | P6, P12 | 列表 + 快照 |
@@ -146,8 +147,8 @@
 
 | 类型 | 命令 | 数量（2026-06-25） | 位置 |
 |------|------|-------------------|------|
-| 单元 | `npm run test:unit` | 24 | `src/**/*.test.{ts,tsx}` |
-| E2E | `npm run test:e2e` | 22 | `e2e/**/*.spec.ts` |
+| 单元 | `npm run test:unit` | 80 | `src/**/*.test.{ts,tsx}` |
+| E2E | `npm run test:e2e` | 45 | `e2e/**/*.spec.ts` |
 | 全量 | `npm run verify` | 上两者 + codegen + tsc + build | `package.json` |
 
 E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
@@ -158,6 +159,7 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-14 | P23 完成（Sandbox 真实 `kind=sandbox` 创建、列表过滤、详情 Provider/Sandbox 状态展示；默认门禁 80 unit / 45 e2e） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 11 条，新增文件存储与对象存储联调） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 9 条，新增 Registry 创建项目动作联调） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 8 条，新增 Registry 权限/Pull Secret/扫描查询联调） |

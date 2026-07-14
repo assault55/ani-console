@@ -407,6 +407,170 @@ test.describe('实例与算力', () => {
     expect(createBody?.root_disk_size_gib).toBe(40)
   })
 
+  test('Sandbox 列表按 kind=sandbox 查询并创建真实 Kubernetes/Kata Sandbox', async ({ page }) => {
+    let listKind: string | null = null
+    let postAttempts = 0
+    const createBodies: Record<string, unknown>[] = []
+
+    await page.route('**/api/v1/instances**', async (route, request) => {
+      const url = new URL(request.url())
+      if (request.method() === 'GET') {
+        listKind = url.searchParams.get('kind')
+        await route.fulfill({
+          status: 200,
+          json: {
+            items: [
+              {
+                id: 'inst-sandbox-existing',
+                tenant_id: 'tenant-1',
+                name: 'existing-sandbox',
+                kind: 'sandbox',
+                state: 'running',
+                provider: 'kubernetes_rest',
+                dev_profile: { mode: 'real', provider: 'kubernetes_rest', real_provider: true },
+                sandbox: {
+                  runtime_class: 'sandbox-kata',
+                  session_state: 'running',
+                  session_timeout: '30m',
+                  network_egress_policy: 'deny_all',
+                },
+                resource_refs: ['pod/default/existing-sandbox'],
+                termination_protection: false,
+                created_at: '2026-06-01T08:00:00Z',
+                updated_at: '2026-06-01T08:00:00Z',
+              },
+            ],
+            total: 1,
+          },
+        })
+        return
+      }
+      if (request.method() === 'POST') {
+        postAttempts += 1
+        createBodies.push(request.postDataJSON() as Record<string, unknown>)
+        if (postAttempts === 1) {
+          await route.fulfill({ status: 503, json: { code: 'UPSTREAM_UNAVAILABLE', message: 'provider unavailable' } })
+          return
+        }
+        await route.fulfill({
+          status: 201,
+          json: {
+            instance: {
+              id: 'inst-sandbox-1',
+              tenant_id: 'tenant-1',
+              name: 'agent-sandbox-001',
+              kind: 'sandbox',
+              state: 'running',
+              provider: 'kubernetes_rest',
+              dev_profile: { mode: 'real', provider: 'kubernetes_rest', real_provider: true },
+              sandbox: {
+                runtime_class: 'sandbox-kata',
+                session_state: 'running',
+                session_timeout: '1h',
+                network_egress_policy: 'internet',
+              },
+              resource_refs: ['pod/default/agent-sandbox-001', 'runtimeclass/sandbox-kata'],
+              termination_protection: false,
+              created_at: '2026-06-01T08:00:00Z',
+              updated_at: '2026-06-01T08:00:00Z',
+            },
+            operation_id: 'op-sandbox-create',
+          },
+        })
+        return
+      }
+      await route.fallback()
+    })
+
+    await page.route('**/api/v1/instances/inst-sandbox-1', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-sandbox-1',
+          tenant_id: 'tenant-1',
+          name: 'agent-sandbox-001',
+          kind: 'sandbox',
+          state: 'running',
+          provider: 'kubernetes_rest',
+          dev_profile: { mode: 'real', provider: 'kubernetes_rest', real_provider: true },
+          sandbox: {
+            runtime_class: 'sandbox-kata',
+            session_state: 'running',
+            session_timeout: '1h',
+            network_egress_policy: 'internet',
+          },
+          resource_refs: ['pod/default/agent-sandbox-001', 'runtimeclass/sandbox-kata'],
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+
+    await page.goto('/instances/sandbox')
+    await expect(page.getByRole('heading', { name: 'Sandbox 实例' })).toBeVisible()
+    expect(listKind).toBe('sandbox')
+
+    await page.getByRole('button', { name: '创建实例' }).click()
+    await page.getByTestId('instance-name-input').fill('agent-sandbox-001')
+    await page.getByTestId('sandbox-session-timeout-select').click()
+    await page.getByRole('option', { name: '1h' }).click()
+    await page.getByTestId('sandbox-egress-policy-select').click()
+    await page.getByRole('option', { name: 'internet' }).click()
+    await page.getByRole('button', { name: '创建实例' }).click()
+    await expect(page.getByText('创建失败，请检查配置后重试')).toBeVisible()
+    await page.getByRole('button', { name: '创建实例' }).click()
+
+    expect(createBodies[0]?.idempotency_key).toBe(createBodies[1]?.idempotency_key)
+    expect(createBodies[1]).toMatchObject({
+      kind: 'sandbox',
+      image: 'docker.changqingyun.cn/mirror/busybox:latest',
+      command: ['sh', '-c', 'uname -a; sleep 300'],
+      sandbox_config: {
+        runtime_class: 'sandbox-kata',
+        session_timeout: '1h',
+        network_egress_policy: 'internet',
+      },
+    })
+    await expect(page).toHaveURL(/\/instances\/sandbox\/inst-sandbox-1/)
+    await expect(page.getByRole('heading', { name: 'agent-sandbox-001' })).toBeVisible()
+    await expect(page.getByText('真实 Kubernetes/Kata 后端')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'sandbox-kata', exact: true })).toBeVisible()
+    await expect(page.getByText('runtimeclass/sandbox-kata')).toBeVisible()
+  })
+
+  test('Sandbox 详情不会把 local dev profile 标成真实运行', async ({ page }) => {
+    await page.route('**/api/v1/instances/inst-sandbox-local', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'inst-sandbox-local',
+          tenant_id: 'tenant-1',
+          name: 'local-sandbox',
+          kind: 'sandbox',
+          state: 'running',
+          provider: 'kubernetes_rest',
+          dev_profile: { mode: 'local', provider: 'local', real_provider: false },
+          sandbox: {
+            runtime_class: 'sandbox-kata',
+            session_state: 'running',
+            session_timeout: '30m',
+            network_egress_policy: 'deny_all',
+          },
+          resource_refs: [],
+          termination_protection: false,
+          created_at: '2026-06-01T08:00:00Z',
+          updated_at: '2026-06-01T08:00:00Z',
+        },
+      })
+    })
+
+    await page.goto('/instances/sandbox/inst-sandbox-local')
+    await expect(page.getByRole('heading', { name: 'local-sandbox' })).toBeVisible()
+    await expect(page.getByText('本地开发模式')).toBeVisible()
+    await expect(page.getByText('真实 Kubernetes/Kata 后端')).toHaveCount(0)
+  })
+
   test('GPU 清单页展示指标', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: '概览' })).toBeVisible({ timeout: 15000 })
