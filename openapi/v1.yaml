@@ -1318,7 +1318,7 @@ components:
       type: object
       required: [idempotency_key, vector]
       properties:
-        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；用于统一前端 POST 校验。搜索请求无资源创建副作用。" }
         vector:
           type: array
           minItems: 1
@@ -1520,7 +1520,7 @@ components:
       type: object
       required: [idempotency_key, tenant_name, redirect_uri]
       properties:
-        idempotency_key: { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；用于统一前端 POST 校验。OIDC 登录仍每次生成新的 state/nonce。" }
         tenant_name:  { type: string, description: "租户 slug，用于限定登录上下文" }
         redirect_uri: { type: string, format: uri, description: "Console/CLI 注册的 OIDC callback 地址" }
 
@@ -1535,7 +1535,7 @@ components:
       type: object
       required: [idempotency_key, state, code, redirect_uri]
       properties:
-        idempotency_key: { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；用于统一前端 POST 校验。OIDC code 仍按一次性消费处理。" }
         state:        { type: string }
         code:         { type: string }
         redirect_uri: { type: string, format: uri }
@@ -1553,7 +1553,7 @@ components:
       type: object
       required: [idempotency_key, refresh_token]
       properties:
-        idempotency_key: { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；用于统一前端 POST 校验。" }
         refresh_token: { type: string }
 
     RefreshAccessTokenResponse:
@@ -1567,7 +1567,7 @@ components:
       type: object
       required: [idempotency_key, jti]
       properties:
-        idempotency_key: { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；用于统一前端 POST 校验。JWT JTI 吊销本身保持幂等。" }
         jti: { type: string, description: "JWT ID，调用方从当前 AccessToken claims 中读取" }
 
     RevokeStatusResponse:

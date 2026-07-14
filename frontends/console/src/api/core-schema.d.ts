@@ -2914,6 +2914,7 @@ export interface components {
             metric: "cosine" | "l2" | "ip";
         };
         VectorStoreSearchRequest: {
+            /** @description 客户端生成；用于统一前端 POST 校验。搜索请求无资源创建副作用。 */
             idempotency_key: string;
             vector: number[];
             /** @default 10 */
@@ -3058,6 +3059,7 @@ export interface components {
             scanned_at?: string;
         };
         BeginOIDCLoginRequest: {
+            /** @description 客户端生成；用于统一前端 POST 校验。OIDC 登录仍每次生成新的 state/nonce。 */
             idempotency_key: string;
             /** @description 租户 slug，用于限定登录上下文 */
             tenant_name: string;
@@ -3073,6 +3075,7 @@ export interface components {
             state: string;
         };
         CompleteOIDCLoginRequest: {
+            /** @description 客户端生成；用于统一前端 POST 校验。OIDC code 仍按一次性消费处理。 */
             idempotency_key: string;
             state: string;
             code: string;
@@ -3088,6 +3091,7 @@ export interface components {
             issued_at?: string;
         };
         RefreshAccessTokenRequest: {
+            /** @description 客户端生成；用于统一前端 POST 校验。 */
             idempotency_key: string;
             refresh_token: string;
         };
@@ -3097,6 +3101,7 @@ export interface components {
             expires_in: number;
         };
         LogoutRequest: {
+            /** @description 客户端生成；用于统一前端 POST 校验。JWT JTI 吊销本身保持幂等。 */
             idempotency_key: string;
             /** @description JWT ID，调用方从当前 AccessToken claims 中读取 */
             jti: string;
