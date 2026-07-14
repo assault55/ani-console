@@ -159,6 +159,7 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-14 | VM noVNC 控制台增加“适配窗口 / 原始尺寸”显示模式；原始尺寸关闭 noVNC 缩放并允许拖动画布，用于缓解鼠标坐标偏移 |
 | 2026-07-14 | 修复 Core API 401 会话失效处理：refresh 不可用时清理认证持久化并跳转 `/login?redirect=...`；默认门禁 82 unit / 47 e2e |
 | 2026-07-14 | 已部署 Console 到 isolated 集群：`docker.changqingyun.cn/ani/ani-console:dev-sandbox-template-ts7-20260714-105051`；代码提交 `4bc39dd`；`ani-console` rollout 成功，NodePort `30081` 返回 200 |
 | 2026-07-14 | Sandbox 模板列表补充“使用模板”动作，跳转创建页并预填镜像/资源规格；后端当前仅提供模板 GET，未启用模板 CRUD |

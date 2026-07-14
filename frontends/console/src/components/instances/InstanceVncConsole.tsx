@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import RFB from '@novnc/novnc'
-import { Alert, Button, Spin, Tag } from '@arco-design/web-react'
+import { Alert, Button, Radio, Spin, Tag } from '@arco-design/web-react'
 import { coreApi } from '@/api/client'
 import { getErrorMessage } from '@/lib/errors'
 
 type ConsoleStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'expired'
+type ViewMode = 'fit' | 'native'
 
 const STATUS_META: Record<ConsoleStatus, { text: string; color: string }> = {
   connecting: { text: '连接中', color: 'blue' },
@@ -20,6 +21,15 @@ function isExpired(expiresAt?: string | null): boolean {
   return Number.isFinite(ms) && Date.now() >= ms
 }
 
+function applyViewMode(rfb: RFB, mode: ViewMode) {
+  const fit = mode === 'fit'
+  rfb.scaleViewport = fit
+  rfb.resizeSession = fit
+  rfb.clipViewport = !fit
+  rfb.dragViewport = !fit
+  rfb.focusOnClick = true
+}
+
 export function InstanceVncConsole({
   instanceId,
   protocol = 'novnc',
@@ -30,9 +40,17 @@ export function InstanceVncConsole({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rfbRef = useRef<RFB | null>(null)
   const expiresAtRef = useRef<string | null>(null)
+  const viewModeRef = useRef<ViewMode>('fit')
   const [status, setStatus] = useState<ConsoleStatus>('connecting')
   const [errorText, setErrorText] = useState<string | null>(null)
   const [reconnectKey, setReconnectKey] = useState(0)
+  const [viewMode, setViewMode] = useState<ViewMode>('fit')
+
+  useEffect(() => {
+    viewModeRef.current = viewMode
+    const rfb = rfbRef.current
+    if (rfb) applyViewMode(rfb, viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     const host = hostRef.current
@@ -60,8 +78,7 @@ export function InstanceVncConsole({
         if (disposed) return
 
         rfb = new RFB(host, url)
-        rfb.scaleViewport = true
-        rfb.resizeSession = true
+        applyViewMode(rfb, viewModeRef.current)
         rfb.background = '#0b0e16'
         rfb.addEventListener('connect', () => {
           if (!disposed) setStatus('connected')
@@ -111,6 +128,15 @@ export function InstanceVncConsole({
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/10 px-3">
         <div className="truncate text-sm text-gray-300">VNC 控制台</div>
         <div className="flex items-center gap-2">
+          <Radio.Group
+            type="button"
+            size="mini"
+            value={viewMode}
+            onChange={(value) => setViewMode(value as ViewMode)}
+          >
+            <Radio value="fit">适配窗口</Radio>
+            <Radio value="native">原始尺寸</Radio>
+          </Radio.Group>
           <Tag color={meta.color}>{meta.text}</Tag>
           {canReconnect ? (
             <Button
@@ -128,13 +154,17 @@ export function InstanceVncConsole({
           <Alert type="error" content={errorText} />
         </div>
       ) : null}
-      <div className="relative min-h-0 flex-1">
+      <div className={`relative min-h-0 flex-1 ${viewMode === 'native' ? 'overflow-auto' : 'overflow-hidden'}`}>
         {status === 'connecting' ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0b0e16]/80">
             <Spin />
           </div>
         ) : null}
-        <div ref={hostRef} data-testid="instance-vnc-console" className="h-full w-full overflow-hidden" />
+        <div
+          ref={hostRef}
+          data-testid="instance-vnc-console"
+          className={viewMode === 'native' ? 'min-h-full min-w-full' : 'h-full w-full overflow-hidden'}
+        />
       </div>
     </div>
   )

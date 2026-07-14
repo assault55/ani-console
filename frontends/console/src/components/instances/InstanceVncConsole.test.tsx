@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InstanceVncConsole } from './InstanceVncConsole'
 
@@ -17,6 +17,9 @@ vi.mock('@novnc/novnc', () => ({
   default: class MockRfb {
     scaleViewport = false
     resizeSession = false
+    clipViewport = false
+    dragViewport = false
+    focusOnClick = false
     background = ''
     disconnect = vi.fn()
 
@@ -36,6 +39,9 @@ vi.mock('@novnc/novnc', () => ({
 class MockRfb {
   scaleViewport = false
   resizeSession = false
+  clipViewport = false
+  dragViewport = false
+  focusOnClick = false
   background = ''
   disconnect = vi.fn()
   constructor(
@@ -75,6 +81,33 @@ describe('InstanceVncConsole', () => {
     expect(mocks.rfbInstances[0]?.url).toBe('wss://console.example/vnc?token=short-ticket')
     expect(mocks.rfbInstances[0]?.scaleViewport).toBe(true)
     expect(mocks.rfbInstances[0]?.resizeSession).toBe(true)
+    expect(mocks.rfbInstances[0]?.clipViewport).toBe(false)
+    expect(mocks.rfbInstances[0]?.dragViewport).toBe(false)
+    expect(mocks.rfbInstances[0]?.focusOnClick).toBe(true)
+  })
+
+  it('switches to native size without requesting a new console session', async () => {
+    mocks.corePost.mockResolvedValue({
+      data: {
+        session_id: 'console-1',
+        protocol: 'novnc',
+        connect_url: 'wss://console.example/vnc?token=short-ticket',
+        url: 'wss://console.example/vnc?token=short-ticket',
+        expires_at: '2099-07-08T10:00:00Z',
+      },
+      error: undefined,
+    })
+
+    const view = render(<InstanceVncConsole instanceId="inst-vm-1" />)
+
+    await waitFor(() => expect(mocks.rfbInstances).toHaveLength(1))
+    fireEvent.click(view.getByText('原始尺寸'))
+
+    expect(mocks.corePost).toHaveBeenCalledTimes(1)
+    expect(mocks.rfbInstances[0]?.scaleViewport).toBe(false)
+    expect(mocks.rfbInstances[0]?.resizeSession).toBe(false)
+    expect(mocks.rfbInstances[0]?.clipViewport).toBe(true)
+    expect(mocks.rfbInstances[0]?.dragViewport).toBe(true)
   })
 
   it('disconnects the RFB session on unmount', async () => {
