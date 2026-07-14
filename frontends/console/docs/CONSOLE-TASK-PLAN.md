@@ -159,8 +159,9 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-14 | 已部署 Console 到 isolated 集群：`docker.changqingyun.cn/ani/ani-console:dev-sandbox-template-ts7-20260714-105051`；代码提交 `4bc39dd`；`ani-console` rollout 成功，NodePort `30081` 返回 200 |
 | 2026-07-14 | Sandbox 模板列表补充“使用模板”动作，跳转创建页并预填镜像/资源规格；后端当前仅提供模板 GET，未启用模板 CRUD |
-| 2026-07-14 | Console 工具链升级 TypeScript 7.0.2；移除 `baseUrl`，OpenAPI codegen 隔离使用 TS5 兼容链路；默认门禁 80 unit / 45 e2e |
+| 2026-07-14 | Console 工具链升级 TypeScript 7.0.2；移除 `baseUrl`，OpenAPI codegen 隔离使用 TS5 兼容链路；默认门禁 80 unit / 46 e2e |
 | 2026-07-14 | P23 完成（Sandbox 真实 `kind=sandbox` 创建、列表过滤、详情 Provider/Sandbox 状态展示；默认门禁 80 unit / 45 e2e） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 11 条，新增文件存储与对象存储联调） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 9 条，新增 Registry 创建项目动作联调） |
