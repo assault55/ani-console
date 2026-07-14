@@ -48,7 +48,7 @@
 | P16 | Playwright E2E | ✅ | [SPRINT-P16](./sprints/SPRINT-P16-e2e-playwright.md) |
 | P17 | 单元测试 + 测试规范 | ✅ | [SPRINT-P17](./sprints/SPRINT-P17-unit-tests-policy.md) |
 
-**当前门禁**：`cd frontends/console && npm run verify` → 80 unit + 45 e2e + build
+**当前门禁**：`cd frontends/console && npm run verify` → 80 unit + 46 e2e + build
 
 ### 2.2 待办（P18+）
 
@@ -96,7 +96,7 @@
 | 设置 | `/settings`, `/settings/api-keys` | P2 | 基础 |
 | 实例 | `/instances`, `/instances/$id`, operations | P4, P15 | 列表/详情/操作链 |
 | GPU | `/gpu-inventory` | P4 | 列表 + 占用 |
-| Sandbox | `/instances/sandbox`, `/instances/sandbox/$id`, `/sandbox-templates` | P4, P23 | 真实 `kind=sandbox` 创建/列表/详情 + 模板 CRUD |
+| Sandbox | `/instances/sandbox`, `/instances/sandbox/$id`, `/sandbox-templates` | P4, P23 | 真实 `kind=sandbox` 创建/列表/详情 + 模板列表/使用模板预填 |
 | K8s | `/k8s-clusters` | P9, P14 | 创建/节点池/Proxy/升级 |
 | 可启动镜像 | `/images` | P22 | 列表 + 本地 ISO 直传（upload_url）+ 删除；供 VM ISO 启动 / noVNC 装机 |
 | 块存储 | `/volumes`, `/volumes/$id` | P6, P12 | 列表 + 快照 |
@@ -159,6 +159,8 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-14 | Sandbox 模板列表补充“使用模板”动作，跳转创建页并预填镜像/资源规格；后端当前仅提供模板 GET，未启用模板 CRUD |
+| 2026-07-14 | Console 工具链升级 TypeScript 7.0.2；移除 `baseUrl`，OpenAPI codegen 隔离使用 TS5 兼容链路；默认门禁 80 unit / 45 e2e |
 | 2026-07-14 | P23 完成（Sandbox 真实 `kind=sandbox` 创建、列表过滤、详情 Provider/Sandbox 状态展示；默认门禁 80 unit / 45 e2e） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 11 条，新增文件存储与对象存储联调） |
 | 2026-06-25 | P20 再扩展（Mock Server smoke 扩展至 9 条，新增 Registry 创建项目动作联调） |

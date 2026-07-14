@@ -331,16 +331,18 @@ export function InstancesListPage(props: InstancesListPageProps = {}) {
 export function InstanceCreateForm({
   kindFilter,
   lockKind = false,
+  initialValues,
   onCancel,
   onCreated,
 }: {
   kindFilter?: InstanceKind
   lockKind?: boolean
+  initialValues?: Partial<InstanceFormState>
   onCancel: () => void
   onCreated: (result: { taskId?: string; instanceId?: string }) => void
 }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<InstanceFormState>(createDefaultForm(kindFilter))
+  const [form, setForm] = useState<InstanceFormState>(() => ({ ...createDefaultForm(kindFilter), ...initialValues }))
   const [createIdempotencyKey, setCreateIdempotencyKey] = useState(() => newIdempotencyKey())
   const vpcs = useQuery({
     queryKey: ['network-vpcs', 'select'],
