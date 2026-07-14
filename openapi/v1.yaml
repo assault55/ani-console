@@ -261,7 +261,7 @@ components:
     EncryptionUnsealTokenRequest:
       type: object
       properties:
-        idempotency_key:   { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
         key_id:            { type: string }
         sealed_object_uri: { type: string }
       required: [idempotency_key, key_id, sealed_object_uri]
@@ -308,7 +308,7 @@ components:
     SecretBindingRequest:
       type: object
       properties:
-        idempotency_key: { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
         target_type: { type: string, enum: [instance, k8s-cluster, service] }
         target_id:   { type: string }
         mount_path:  { type: string }
@@ -416,7 +416,7 @@ components:
       type: object
       required: [idempotency_key]
       properties:
-        idempotency_key:  { type: string }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
         platform_name:   { type: string }
         logo_light_url:  { type: string, format: uri }
         logo_dark_url:   { type: string, format: uri }
@@ -607,7 +607,7 @@ components:
           format: int64
           minimum: 1
           nullable: true
-          description: "VM 空白系统盘大小（GiB）。boot_media.type=iso 时必填（或由服务端默认）；containerDisk 路径可忽略。"
+          description: "VM 空白系统盘大小（GiB）。boot_media.type=iso 时必填（未传时服务端默认 40）；containerDisk 路径可忽略。"
         ssh_username:   { type: string, nullable: true, default: "ubuntu", description: "VM SSH 用户名；仅 VM 使用" }
         ssh_key_ref:    { type: string, nullable: true, description: "VM SSH key/secret 引用；不包含私钥内容" }
         command:
@@ -702,7 +702,7 @@ components:
         storage_class:
           type: string
           nullable: true
-          description: "使用的存储类；未指定时由平台默认（如 ani-rbd-ssd）。"
+          description: "使用的存储类；未指定时省略 storageClassName，由集群默认 StorageClass 承接。"
         dev_profile:
           $ref: '#/components/schemas/CoreDevProfileInfo'
         created_at:  { type: string, format: date-time }
@@ -738,7 +738,7 @@ components:
         storage_class:
           type: string
           nullable: true
-          description: "可选；默认平台块存储类。"
+          description: "可选；未指定时省略，由集群默认 StorageClass 承接。"
 
     ImageUploadSession:
       type: object
@@ -751,7 +751,10 @@ components:
         upload_url:
           type: string
           format: uri
-          description: "浏览器/脚本可直达的上传端点（通常为 CDI upload proxy 的平台暴露地址）。"
+          description: |
+            浏览器/脚本可直达的上传端点。isolated/dev 下 Gateway 返回
+            `/api/v1/images/upload-proxy`（同源 HTTP，由 Gateway 流式转发到 CDI
+            uploadproxy），避免浏览器直连 NodePort 自签证书失败。
         token:
           type: string
           description: "短期上传票据；放入 Authorization: Bearer <token> 或实现约定的 header/query。"
@@ -973,7 +976,7 @@ components:
       required: [idempotency_key]
       properties:
         protocol: { type: string, enum: [console, vnc, novnc, serial], default: "vnc" }
-        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；同一 tenant 下复用可返回同一短期 session" }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "必填；同一 tenant 下复用可返回同一短期 session" }
 
     InstanceConsoleSession:
       type: object
@@ -1577,7 +1580,11 @@ components:
       type: object
       required: [idempotency_key, name, scopes]
       properties:
-        idempotency_key:  { type: string }
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: "客户端生成；同一 tenant_id 下短 TTL 内返回同一 key_value 重放结果，过期后拒绝重复创建。"
         name:           { type: string, maxLength: 128 }
         user_id:        { type: string, description: "可选；为空时使用当前认证用户" }
         scopes:
@@ -1852,6 +1859,12 @@ components:
         bucket_id:    { type: string, format: uuid }
         key:          { type: string }
         content_type: { type: string }
+
+    StorageObjectCompleteRequest:
+      type: object
+      required: [idempotency_key]
+      properties:
+        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
 
     StorageObjectUploadResponse:
       type: object
@@ -3298,10 +3311,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [idempotency_key]
-              properties:
-                idempotency_key: { type: string, minLength: 1, maxLength: 128 }
+              $ref: '#/components/schemas/StorageObjectCompleteRequest'
       responses:
         "200":
           description: 已对齐的对象元数据
@@ -4575,6 +4585,39 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "409": { $ref: '#/components/responses/Conflict' }
+
+  /images/upload-proxy:
+    post:
+      operationId: proxyImageUpload
+      summary: 代理 ISO 文件上传到 CDI uploadproxy
+      description: |
+        浏览器将 ISO 二进制 POST 到此路径；Gateway 流式转发到集群内 CDI uploadproxy。
+        鉴权使用创建上传会话返回的短期 upload token（Authorization: Bearer <token>），
+        不要求用户 JWT。此路径用于规避浏览器直连 NodePort 自签证书失败。
+      tags: [Images]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+          application/x-iso9660-image:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: CDI 接受上传（或按 CDI 返回码透传）
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "502":
+          description: 上游 CDI uploadproxy 不可达
+    options:
+      operationId: proxyImageUploadOptions
+      summary: CORS preflight for image upload proxy
+      tags: [Images]
+      security: []
+      responses:
+        "204":
+          description: CORS preflight OK
 
   /images/{image_id}:
     get:

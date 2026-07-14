@@ -1701,6 +1701,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images/upload-proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 代理 ISO 文件上传到 CDI uploadproxy
+         * @description 浏览器将 ISO 二进制 POST 到此路径；Gateway 流式转发到集群内 CDI uploadproxy。
+         *     鉴权使用创建上传会话返回的短期 upload token（Authorization: Bearer <token>），
+         *     不要求用户 JWT。此路径用于规避浏览器直连 NodePort 自签证书失败。
+         */
+        post: operations["proxyImageUpload"];
+        delete?: never;
+        /** CORS preflight for image upload proxy */
+        options: operations["proxyImageUploadOptions"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{image_id}": {
         parameters: {
             query?: never;
@@ -2269,7 +2292,7 @@ export interface components {
             boot_media?: components["schemas"]["InstanceBootMedia"];
             /**
              * Format: int64
-             * @description VM 空白系统盘大小（GiB）。boot_media.type=iso 时必填（或由服务端默认）；containerDisk 路径可忽略。
+             * @description VM 空白系统盘大小（GiB）。boot_media.type=iso 时必填（未传时服务端默认 40）；containerDisk 路径可忽略。
              */
             root_disk_size_gib?: number | null;
             /**
@@ -2355,7 +2378,7 @@ export interface components {
             message?: string | null;
             /** @description 可选：导入完成后关联的 Core StorageVolume.id（若平台将其登记为卷）。 */
             volume_id?: string | null;
-            /** @description 使用的存储类；未指定时由平台默认（如 ani-rbd-ssd）。 */
+            /** @description 使用的存储类；未指定时省略 storageClassName，由集群默认 StorageClass 承接。 */
             storage_class?: string | null;
             dev_profile?: components["schemas"]["CoreDevProfileInfo"];
             /** Format: date-time */
@@ -2383,7 +2406,7 @@ export interface components {
             size_gib: number;
             /** @description 可选；ISO 可用 application/x-iso9660-image。 */
             content_type?: string | null;
-            /** @description 可选；默认平台块存储类。 */
+            /** @description 可选；未指定时省略，由集群默认 StorageClass 承接。 */
             storage_class?: string | null;
         };
         /**
@@ -2394,7 +2417,9 @@ export interface components {
             image: components["schemas"]["Image"];
             /**
              * Format: uri
-             * @description 浏览器/脚本可直达的上传端点（通常为 CDI upload proxy 的平台暴露地址）。
+             * @description 浏览器/脚本可直达的上传端点。isolated/dev 下 Gateway 返回
+             *     `/api/v1/images/upload-proxy`（同源 HTTP，由 Gateway 流式转发到 CDI
+             *     uploadproxy），避免浏览器直连 NodePort 自签证书失败。
              */
             upload_url: string;
             /** @description 短期上传票据；放入 Authorization: Bearer <token> 或实现约定的 header/query。 */
@@ -2594,7 +2619,7 @@ export interface components {
              * @enum {string}
              */
             protocol: "console" | "vnc" | "novnc" | "serial";
-            /** @description 客户端生成；同一 tenant 下复用可返回同一短期 session */
+            /** @description 必填；同一 tenant 下复用可返回同一短期 session */
             idempotency_key: string;
         };
         InstanceConsoleSession: {
@@ -3081,6 +3106,7 @@ export interface components {
             status: "revoked";
         };
         CreateAPIKeyRequest: {
+            /** @description 客户端生成；同一 tenant_id 下短 TTL 内返回同一 key_value 重放结果，过期后拒绝重复创建。 */
             idempotency_key: string;
             name: string;
             /** @description 可选；为空时使用当前认证用户 */
@@ -3313,6 +3339,9 @@ export interface components {
             bucket_id: string;
             key: string;
             content_type?: string;
+        };
+        StorageObjectCompleteRequest: {
+            idempotency_key: string;
         };
         StorageObjectUploadResponse: {
             /** Format: uri */
@@ -5156,9 +5185,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    idempotency_key: string;
-                };
+                "application/json": components["schemas"]["StorageObjectCompleteRequest"];
             };
         };
         responses: {
@@ -6687,6 +6714,56 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    proxyImageUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+                "application/x-iso9660-image": string;
+            };
+        };
+        responses: {
+            /** @description CDI 接受上传（或按 CDI 返回码透传） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description 上游 CDI uploadproxy 不可达 */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    proxyImageUploadOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CORS preflight OK */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getImage: {
