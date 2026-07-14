@@ -3,6 +3,7 @@ import RFB from '@novnc/novnc'
 import { Alert, Button, Radio, Spin, Tag } from '@arco-design/web-react'
 import { coreApi } from '@/api/client'
 import { getErrorMessage } from '@/lib/errors'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 type ConsoleStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'expired'
 type ViewMode = 'fit' | 'native'
@@ -66,7 +67,7 @@ export function InstanceVncConsole({
       try {
         const { data, error } = await coreApi.POST('/instances/{instance_id}/console', {
           params: { path: { instance_id: instanceId } },
-          body: { protocol },
+          body: { protocol, idempotency_key: newIdempotencyKey() },
         })
         if (error) throw error
         const url = data?.connect_url || data?.url

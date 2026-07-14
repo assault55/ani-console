@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useBrandingStore } from '@/stores/branding'
 import { useMutation } from '@tanstack/react-query'
 import { coreApi } from '@/api/client'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -19,7 +20,7 @@ function SettingsPage() {
     mutationFn: async () => {
       const jti = useAuthStore.getState().getAccessTokenJti()
       if (!jti) throw new Error('当前 access token 缺少 jti，无法调用服务端登出')
-      await coreApi.POST('/auth/logout', { body: { jti } })
+      await coreApi.POST('/auth/logout', { body: { jti, idempotency_key: newIdempotencyKey() } })
     },
     onSettled: () => {
       clear()

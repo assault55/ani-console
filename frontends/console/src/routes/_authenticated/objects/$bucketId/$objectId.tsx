@@ -7,6 +7,7 @@ import { StatusTag } from '@/components/shell/StatusTag'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import { showApiError } from '@/api/helpers'
 import { formatDateTime } from '@/lib/format'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 export const Route = createFileRoute('/_authenticated/objects/$bucketId/$objectId')({
   component: ObjectDetailPage,
@@ -32,6 +33,7 @@ function ObjectDetailPage() {
     mutationFn: async () => {
       const { data, error } = await coreApi.POST('/objects/{object_id}/complete', {
         params: { path: { object_id: objectId } },
+        body: { idempotency_key: newIdempotencyKey() },
       })
       if (error) throw error
       return data

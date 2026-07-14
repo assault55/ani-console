@@ -20,6 +20,7 @@ import { CursorTable } from '@/components/tables/CursorTable'
 import { StatusTag } from '@/components/shell/StatusTag'
 import { showApiError } from '@/api/helpers'
 import { formatDateTime } from '@/lib/format'
+import { newIdempotencyKey } from '@/lib/idempotency'
 import {
   assertIntegerRange,
   assertMaxLength,
@@ -75,6 +76,7 @@ function ApiKeysPage() {
     const invalidScope = scopes.find((scope) => !isValidScope(scope))
     if (invalidScope) throw new Error(`权限范围格式不正确：${invalidScope}`)
     return {
+      idempotency_key: newIdempotencyKey(),
       name: requestName,
       user_id: userId.trim() || undefined,
       scopes,

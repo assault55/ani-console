@@ -5,6 +5,7 @@ import { SideMenu } from './SideMenu'
 import { useBrandingStore } from '@/stores/branding'
 import { coreApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 const { Header, Sider, Content } = Layout
 
@@ -28,7 +29,7 @@ export function AppShell({ children }: AppShellProps) {
     mutationFn: async () => {
       const jti = useAuthStore.getState().getAccessTokenJti()
       if (!jti) throw new Error('当前 access token 缺少 jti，无法调用服务端登出')
-      const { error } = await coreApi.POST('/auth/logout', { body: { jti } })
+      const { error } = await coreApi.POST('/auth/logout', { body: { jti, idempotency_key: newIdempotencyKey() } })
       if (error) throw error
     },
     onSettled: () => {

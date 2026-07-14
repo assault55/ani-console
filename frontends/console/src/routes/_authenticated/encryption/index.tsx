@@ -117,7 +117,7 @@ function EncryptionPage() {
   const unseal = useMutation({
     mutationFn: async () => {
       const { data, error } = await coreApi.POST('/encryption/unseal-token', {
-        body: { key_id: sealKeyId, sealed_object_uri: sealObjectUri },
+        body: { key_id: sealKeyId, sealed_object_uri: sealObjectUri, idempotency_key: newIdempotencyKey() },
       })
       if (error) throw error
       setUnsealToken(data?.unseal_token ?? '—')

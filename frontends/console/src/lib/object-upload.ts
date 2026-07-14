@@ -33,6 +33,7 @@ export async function uploadStorageObjectFile(input: {
 
   const { data: completed, error: completeError } = await coreApi.POST('/objects/{object_id}/complete', {
     params: { path: { object_id: data.object_id } },
+    body: { idempotency_key: newIdempotencyKey() },
   })
   if (completeError) throw completeError
   if (!completed) {

@@ -1884,6 +1884,8 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
+                    /** Format: uuid */
+                    idempotency_key: string;
                     /** Format: binary */
                     file: string;
                 };

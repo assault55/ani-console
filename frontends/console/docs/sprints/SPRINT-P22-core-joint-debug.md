@@ -421,3 +421,18 @@ npm run verify
 | `src/lib/image-upload.test.ts` | 覆盖 503 自动重试、同一个 File 原始二进制重发、真实 loaded/total 进度 |
 
 验证：`npm run verify` 通过（codegen、typecheck、unit 76/76、E2E 42/42、build）。
+
+---
+
+## 16. 执行记录：Core/Services 幂等契约补齐（2026-07-14）
+
+按当前 Core skill 规则检查 OpenAPI 契约，补齐 POST / 有副作用 PUT·PATCH 的 `idempotency_key` 要求，并同步 Console 生成类型与调用点。
+
+| 文件/区域 | 说明 |
+|-----------|------|
+| `openapi/v1.yaml`、`openapi/services/v1.yaml` | 为 auth、console session、对象 complete、品牌、加密解封、Secret 绑定、向量搜索、知识库文档上传等请求体补必需 `idempotency_key` |
+| `src/api/core-schema.d.ts`、`src/api/schema.d.ts` | 重新生成 Core / Services OpenAPI 类型 |
+| `src/api/client.ts`、`src/lib/oidc-exchange.ts`、`src/components/instances/InstanceVncConsole.tsx` 等调用点 | 写操作统一补 `newIdempotencyKey()`；VNC 测试更新为断言幂等键存在 |
+| `.codex/skills/development-record/SKILL.md`、`.cursor/rules/design-spec-frozen.mdc` | 对齐 Core 实现规则与 Cursor 规则入口 |
+
+验证：OpenAPI 幂等扫描 `PASS`；`npm run codegen`、`npm run typecheck`、`npm run test`（83/83）、`npm run build`、`git diff --check` 通过。

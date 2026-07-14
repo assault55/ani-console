@@ -1,6 +1,7 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from './core-schema'
 import { useAuthStore } from '@/stores/auth'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 export const CORE_API_BASE = '/api/v1'
 
@@ -48,7 +49,7 @@ const authMiddleware: Middleware = {
     }
 
     const { data, error } = await coreApi.POST('/auth/refresh', {
-      body: { refresh_token: refreshToken },
+      body: { refresh_token: refreshToken, idempotency_key: newIdempotencyKey() },
     })
     if (error || !data?.access_token) {
       expireAuthSession()

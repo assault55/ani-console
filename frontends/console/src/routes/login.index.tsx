@@ -6,6 +6,7 @@ import { coreApi } from '@/api/client'
 import { AuthCenterLayout } from '@/components/shell/AuthCenterLayout'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import { isAuthenticated } from '@/stores/auth'
+import { newIdempotencyKey } from '@/lib/idempotency'
 
 export const Route = createFileRoute('/login/')({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
@@ -27,7 +28,7 @@ function LoginPage() {
     mutationFn: async () => {
       const redirectUri = import.meta.env.VITE_OIDC_REDIRECT_URI || `${window.location.origin}/login/callback`
       const { data, error } = await coreApi.POST('/auth/oidc/begin', {
-        body: { redirect_uri: redirectUri, tenant_name: 'default' },
+        body: { redirect_uri: redirectUri, tenant_name: 'default', idempotency_key: newIdempotencyKey() },
       })
       if (error) throw error
       if (!data?.authorization_url) throw new Error('未返回授权地址')

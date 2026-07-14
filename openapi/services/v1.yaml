@@ -945,8 +945,9 @@ paths:
         content:
           multipart/form-data:
             schema:
-              required: [file]
+              required: [idempotency_key, file]
               properties:
+                idempotency_key: { type: string, format: uuid }
                 file: { type: string, format: binary }
       responses:
         "202":

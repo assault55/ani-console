@@ -118,7 +118,7 @@ function VectorStoresPage() {
       const parsedFilter = filterJson.trim() ? JSON.parse(filterJson) : undefined
       const { data, error } = await coreApi.POST('/vector-stores/{vector_store_id}/search', {
         params: { path: { vector_store_id: detailId! } },
-        body: { vector, top_k: topK, filter: parsedFilter },
+        body: { vector, top_k: topK, filter: parsedFilter, idempotency_key: newIdempotencyKey() },
       })
       if (error) throw error
       return data

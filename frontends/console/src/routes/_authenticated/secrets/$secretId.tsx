@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell/AppShell'
 import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import { showApiError } from '@/api/helpers'
 import { formatDateTime } from '@/lib/format'
+import { newIdempotencyKey } from '@/lib/idempotency'
 import type { components } from '@/api/core-schema'
 
 type BindingTargetType = components['schemas']['SecretBindingRequest']['target_type']
@@ -39,6 +40,7 @@ function SecretDetailPage() {
       const { data, error } = await coreApi.POST('/secrets/{secret_id}/bindings', {
         params: { path: { secret_id: secretId } },
         body: {
+          idempotency_key: newIdempotencyKey(),
           target_type: targetType,
           target_id: targetId,
           mount_path: mountPath || undefined,

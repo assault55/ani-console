@@ -1,4 +1,5 @@
 import { coreApi } from '@/api/client'
+import { newIdempotencyKey } from '@/lib/idempotency'
 import type { AuthTokens } from '@/stores/auth'
 
 const inflight = new Map<string, Promise<AuthTokens>>()
@@ -9,7 +10,7 @@ export function exchangeOidcCode(code: string, state: string, redirectUri: strin
   if (existing) return existing
 
   const promise = coreApi
-    .POST('/auth/token', { body: { code, state, redirect_uri: redirectUri } })
+    .POST('/auth/token', { body: { code, state, redirect_uri: redirectUri, idempotency_key: newIdempotencyKey() } })
     .then(({ data, error }) => {
       if (error || !data?.access_token || !data.refresh_token) {
         throw error ?? new Error('登录失败：未返回 access_token')

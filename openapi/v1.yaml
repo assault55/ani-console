@@ -261,9 +261,10 @@ components:
     EncryptionUnsealTokenRequest:
       type: object
       properties:
+        idempotency_key:   { type: string }
         key_id:            { type: string }
         sealed_object_uri: { type: string }
-      required: [key_id, sealed_object_uri]
+      required: [idempotency_key, key_id, sealed_object_uri]
     EncryptionUnsealTokenResponse:
       type: object
       properties:
@@ -307,11 +308,12 @@ components:
     SecretBindingRequest:
       type: object
       properties:
+        idempotency_key: { type: string }
         target_type: { type: string, enum: [instance, k8s-cluster, service] }
         target_id:   { type: string }
         mount_path:  { type: string }
         env_prefix:  { type: string }
-      required: [target_type, target_id]
+      required: [idempotency_key, target_type, target_id]
     SecretBinding:
       type: object
       properties:
@@ -412,7 +414,9 @@ components:
         updated_at:      { type: string, format: date-time }
     BrandingUpdateRequest:
       type: object
+      required: [idempotency_key]
       properties:
+        idempotency_key:  { type: string }
         platform_name:   { type: string }
         logo_light_url:  { type: string, format: uri }
         logo_dark_url:   { type: string, format: uri }
@@ -966,9 +970,10 @@ components:
 
     CreateInstanceConsoleSessionRequest:
       type: object
+      required: [idempotency_key]
       properties:
         protocol: { type: string, enum: [console, vnc, novnc, serial], default: "vnc" }
-        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "可选；同一 tenant 下复用可返回同一短期 session" }
+        idempotency_key: { type: string, minLength: 1, maxLength: 128, description: "客户端生成；同一 tenant 下复用可返回同一短期 session" }
 
     InstanceConsoleSession:
       type: object
@@ -1308,8 +1313,9 @@ components:
 
     VectorStoreSearchRequest:
       type: object
-      required: [vector]
+      required: [idempotency_key, vector]
       properties:
+        idempotency_key: { type: string, minLength: 1, maxLength: 128 }
         vector:
           type: array
           minItems: 1
@@ -1509,8 +1515,9 @@ components:
 
     BeginOIDCLoginRequest:
       type: object
-      required: [tenant_name, redirect_uri]
+      required: [idempotency_key, tenant_name, redirect_uri]
       properties:
+        idempotency_key: { type: string }
         tenant_name:  { type: string, description: "租户 slug，用于限定登录上下文" }
         redirect_uri: { type: string, format: uri, description: "Console/CLI 注册的 OIDC callback 地址" }
 
@@ -1523,8 +1530,9 @@ components:
 
     CompleteOIDCLoginRequest:
       type: object
-      required: [state, code, redirect_uri]
+      required: [idempotency_key, state, code, redirect_uri]
       properties:
+        idempotency_key: { type: string }
         state:        { type: string }
         code:         { type: string }
         redirect_uri: { type: string, format: uri }
@@ -1540,8 +1548,9 @@ components:
 
     RefreshAccessTokenRequest:
       type: object
-      required: [refresh_token]
+      required: [idempotency_key, refresh_token]
       properties:
+        idempotency_key: { type: string }
         refresh_token: { type: string }
 
     RefreshAccessTokenResponse:
@@ -1553,8 +1562,9 @@ components:
 
     LogoutRequest:
       type: object
-      required: [jti]
+      required: [idempotency_key, jti]
       properties:
+        idempotency_key: { type: string }
         jti: { type: string, description: "JWT ID，调用方从当前 AccessToken claims 中读取" }
 
     RevokeStatusResponse:
@@ -1565,8 +1575,9 @@ components:
 
     CreateAPIKeyRequest:
       type: object
-      required: [name, scopes]
+      required: [idempotency_key, name, scopes]
       properties:
+        idempotency_key:  { type: string }
         name:           { type: string, maxLength: 128 }
         user_id:        { type: string, description: "可选；为空时使用当前认证用户" }
         scopes:
@@ -3282,6 +3293,15 @@ paths:
       x-ani-rbac-scope: "scope:objects:create"
       parameters:
         - { name: object_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idempotency_key]
+              properties:
+                idempotency_key: { type: string, minLength: 1, maxLength: 128 }
       responses:
         "200":
           description: 已对齐的对象元数据
@@ -3677,8 +3697,12 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required: [idempotency_key, file]
               properties:
+                idempotency_key:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
                 variant:
                   type: string
                   enum: [light, dark, favicon]

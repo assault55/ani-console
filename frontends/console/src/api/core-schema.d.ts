@@ -1912,6 +1912,7 @@ export interface components {
             dev_profile?: components["schemas"]["CoreDevProfileInfo"];
         };
         EncryptionUnsealTokenRequest: {
+            idempotency_key: string;
             key_id: string;
             sealed_object_uri: string;
         };
@@ -1953,6 +1954,7 @@ export interface components {
             next_cursor?: string | null;
         };
         SecretBindingRequest: {
+            idempotency_key: string;
             /** @enum {string} */
             target_type: "instance" | "k8s-cluster" | "service";
             target_id: string;
@@ -2058,6 +2060,7 @@ export interface components {
             updated_at?: string;
         };
         BrandingUpdateRequest: {
+            idempotency_key: string;
             platform_name?: string;
             /** Format: uri */
             logo_light_url?: string;
@@ -2591,8 +2594,8 @@ export interface components {
              * @enum {string}
              */
             protocol: "console" | "vnc" | "novnc" | "serial";
-            /** @description 可选；同一 tenant 下复用可返回同一短期 session */
-            idempotency_key?: string;
+            /** @description 客户端生成；同一 tenant 下复用可返回同一短期 session */
+            idempotency_key: string;
         };
         InstanceConsoleSession: {
             /** @description 对应 operation timeline，可通过 /instance-operations/{operation_id} 查询 */
@@ -2886,6 +2889,7 @@ export interface components {
             metric: "cosine" | "l2" | "ip";
         };
         VectorStoreSearchRequest: {
+            idempotency_key: string;
             vector: number[];
             /** @default 10 */
             top_k: number;
@@ -3029,6 +3033,7 @@ export interface components {
             scanned_at?: string;
         };
         BeginOIDCLoginRequest: {
+            idempotency_key: string;
             /** @description 租户 slug，用于限定登录上下文 */
             tenant_name: string;
             /**
@@ -3043,6 +3048,7 @@ export interface components {
             state: string;
         };
         CompleteOIDCLoginRequest: {
+            idempotency_key: string;
             state: string;
             code: string;
             /** Format: uri */
@@ -3057,6 +3063,7 @@ export interface components {
             issued_at?: string;
         };
         RefreshAccessTokenRequest: {
+            idempotency_key: string;
             refresh_token: string;
         };
         RefreshAccessTokenResponse: {
@@ -3065,6 +3072,7 @@ export interface components {
             expires_in: number;
         };
         LogoutRequest: {
+            idempotency_key: string;
             /** @description JWT ID，调用方从当前 AccessToken claims 中读取 */
             jti: string;
         };
@@ -3073,6 +3081,7 @@ export interface components {
             status: "revoked";
         };
         CreateAPIKeyRequest: {
+            idempotency_key: string;
             name: string;
             /** @description 可选；为空时使用当前认证用户 */
             user_id?: string;
@@ -5145,7 +5154,13 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    idempotency_key: string;
+                };
+            };
+        };
         responses: {
             /** @description 已对齐的对象元数据 */
             200: {
@@ -5659,6 +5674,7 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
+                    idempotency_key: string;
                     /**
                      * @default light
                      * @enum {string}

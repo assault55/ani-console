@@ -76,7 +76,7 @@ describe('InstanceVncConsole', () => {
     await waitFor(() => expect(mocks.rfbInstances).toHaveLength(1))
     expect(mocks.corePost).toHaveBeenCalledWith('/instances/{instance_id}/console', {
       params: { path: { instance_id: 'inst-vm-1' } },
-      body: { protocol: 'novnc' },
+      body: { protocol: 'novnc', idempotency_key: expect.any(String) },
     })
     expect(mocks.rfbInstances[0]?.url).toBe('wss://console.example/vnc?token=short-ticket')
     expect(mocks.rfbInstances[0]?.scaleViewport).toBe(true)
