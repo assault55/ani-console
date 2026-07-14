@@ -8,17 +8,20 @@ import { ApiErrorAlert } from '@/components/feedback/ApiErrorAlert'
 import { isAuthenticated } from '@/stores/auth'
 
 export const Route = createFileRoute('/login/')({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search.redirect === 'string' && search.redirect.startsWith('/') ? { redirect: search.redirect } : {},
   component: LoginPage,
 })
 
 function LoginPage() {
   const navigate = useNavigate()
+  const { redirect = '/' } = Route.useSearch()
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate({ to: '/', replace: true })
+      navigate({ to: redirect, replace: true })
     }
-  }, [navigate])
+  }, [navigate, redirect])
 
   const login = useMutation({
     mutationFn: async () => {

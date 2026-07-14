@@ -48,7 +48,7 @@
 | P16 | Playwright E2E | ✅ | [SPRINT-P16](./sprints/SPRINT-P16-e2e-playwright.md) |
 | P17 | 单元测试 + 测试规范 | ✅ | [SPRINT-P17](./sprints/SPRINT-P17-unit-tests-policy.md) |
 
-**当前门禁**：`cd frontends/console && npm run verify` → 80 unit + 46 e2e + build
+**当前门禁**：`cd frontends/console && npm run verify` → 82 unit + 47 e2e + build
 
 ### 2.2 待办（P18+）
 
@@ -159,6 +159,7 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-14 | 修复 Core API 401 会话失效处理：refresh 不可用时清理认证持久化并跳转 `/login?redirect=...`；默认门禁 82 unit / 47 e2e |
 | 2026-07-14 | 已部署 Console 到 isolated 集群：`docker.changqingyun.cn/ani/ani-console:dev-sandbox-template-ts7-20260714-105051`；代码提交 `4bc39dd`；`ani-console` rollout 成功，NodePort `30081` 返回 200 |
 | 2026-07-14 | Sandbox 模板列表补充“使用模板”动作，跳转创建页并预填镜像/资源规格；后端当前仅提供模板 GET，未启用模板 CRUD |
 | 2026-07-14 | Console 工具链升级 TypeScript 7.0.2；移除 `baseUrl`，OpenAPI codegen 隔离使用 TS5 兼容链路；默认门禁 80 unit / 46 e2e |

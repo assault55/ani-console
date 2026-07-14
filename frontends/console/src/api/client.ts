@@ -6,6 +6,20 @@ export const CORE_API_BASE = '/api/v1'
 
 export const coreApi = createClient<paths>({ baseUrl: CORE_API_BASE, credentials: 'include' })
 
+export function redirectToLogin() {
+  if (typeof window === 'undefined') return
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  if (window.location.pathname.startsWith('/login')) return
+  const target = `/login?redirect=${encodeURIComponent(current)}`
+  window.location.assign(target)
+}
+
+export function expireAuthSession() {
+  useAuthStore.getState().clear()
+  useAuthStore.persist.clearStorage()
+  redirectToLogin()
+}
+
 function isPublicAuthRequest(request: Request): boolean {
   const path = new URL(request.url).pathname
   return (
@@ -28,13 +42,16 @@ const authMiddleware: Middleware = {
     if (isPublicAuthRequest(request)) return response
     if (response.status !== 401) return response
     const refreshToken = useAuthStore.getState().tokens?.refresh_token
-    if (!refreshToken || request.url.includes('/auth/refresh')) return response
+    if (!refreshToken || request.url.includes('/auth/refresh')) {
+      expireAuthSession()
+      return response
+    }
 
     const { data, error } = await coreApi.POST('/auth/refresh', {
       body: { refresh_token: refreshToken },
     })
     if (error || !data?.access_token) {
-      useAuthStore.getState().clear()
+      expireAuthSession()
       return response
     }
 
