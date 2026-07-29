@@ -45,6 +45,12 @@ import { Route as AuthenticatedInstancesContainerRouteImport } from './routes/_a
 import { Route as AuthenticatedInstancesInstanceIdRouteImport } from './routes/_authenticated/instances/$instanceId'
 import { Route as AuthenticatedInstanceOperationsOperationIdRouteImport } from './routes/_authenticated/instance-operations/$operationId'
 import { Route as AuthenticatedFilesystemsFilesystemIdRouteImport } from './routes/_authenticated/filesystems/$filesystemId'
+import { Route as AuthenticatedDemoLeafRouteImport } from './routes/_authenticated/demo/leaf'
+import { Route as AuthenticatedDemoBI2RouteImport } from './routes/_authenticated/demo/b-i-2'
+import { Route as AuthenticatedDemoBI1RouteImport } from './routes/_authenticated/demo/b-i-1'
+import { Route as AuthenticatedDemoB1RouteImport } from './routes/_authenticated/demo/b-1'
+import { Route as AuthenticatedDemoA2RouteImport } from './routes/_authenticated/demo/a-2'
+import { Route as AuthenticatedDemoA1RouteImport } from './routes/_authenticated/demo/a-1'
 import { Route as AuthenticatedObjectsBucketIdIndexRouteImport } from './routes/_authenticated/objects/$bucketId/index'
 import { Route as AuthenticatedNetworksVpcsIndexRouteImport } from './routes/_authenticated/networks/vpcs/index'
 import { Route as AuthenticatedNetworksSubnetsIndexRouteImport } from './routes/_authenticated/networks/subnets/index'
@@ -269,6 +275,36 @@ const AuthenticatedFilesystemsFilesystemIdRoute =
     path: '/filesystems/$filesystemId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDemoLeafRoute = AuthenticatedDemoLeafRouteImport.update({
+  id: '/demo/leaf',
+  path: '/demo/leaf',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDemoBI2Route = AuthenticatedDemoBI2RouteImport.update({
+  id: '/demo/b-i-2',
+  path: '/demo/b-i-2',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDemoBI1Route = AuthenticatedDemoBI1RouteImport.update({
+  id: '/demo/b-i-1',
+  path: '/demo/b-i-1',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDemoB1Route = AuthenticatedDemoB1RouteImport.update({
+  id: '/demo/b-1',
+  path: '/demo/b-1',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDemoA2Route = AuthenticatedDemoA2RouteImport.update({
+  id: '/demo/a-2',
+  path: '/demo/a-2',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDemoA1Route = AuthenticatedDemoA1RouteImport.update({
+  id: '/demo/a-1',
+  path: '/demo/a-1',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedObjectsBucketIdIndexRoute =
   AuthenticatedObjectsBucketIdIndexRouteImport.update({
     id: '/',
@@ -365,6 +401,12 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRouteWithChildren
   '/login/callback': typeof LoginCallbackRoute
   '/login/': typeof LoginIndexRoute
+  '/demo/a-1': typeof AuthenticatedDemoA1Route
+  '/demo/a-2': typeof AuthenticatedDemoA2Route
+  '/demo/b-1': typeof AuthenticatedDemoB1Route
+  '/demo/b-i-1': typeof AuthenticatedDemoBI1Route
+  '/demo/b-i-2': typeof AuthenticatedDemoBI2Route
+  '/demo/leaf': typeof AuthenticatedDemoLeafRoute
   '/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
@@ -416,6 +458,12 @@ export interface FileRoutesByTo {
   '/login/callback': typeof LoginCallbackRoute
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginIndexRoute
+  '/demo/a-1': typeof AuthenticatedDemoA1Route
+  '/demo/a-2': typeof AuthenticatedDemoA2Route
+  '/demo/b-1': typeof AuthenticatedDemoB1Route
+  '/demo/b-i-1': typeof AuthenticatedDemoBI1Route
+  '/demo/b-i-2': typeof AuthenticatedDemoBI2Route
+  '/demo/leaf': typeof AuthenticatedDemoLeafRoute
   '/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
@@ -469,6 +517,12 @@ export interface FileRoutesById {
   '/login/callback': typeof LoginCallbackRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/login/': typeof LoginIndexRoute
+  '/_authenticated/demo/a-1': typeof AuthenticatedDemoA1Route
+  '/_authenticated/demo/a-2': typeof AuthenticatedDemoA2Route
+  '/_authenticated/demo/b-1': typeof AuthenticatedDemoB1Route
+  '/_authenticated/demo/b-i-1': typeof AuthenticatedDemoBI1Route
+  '/_authenticated/demo/b-i-2': typeof AuthenticatedDemoBI2Route
+  '/_authenticated/demo/leaf': typeof AuthenticatedDemoLeafRoute
   '/_authenticated/filesystems/$filesystemId': typeof AuthenticatedFilesystemsFilesystemIdRoute
   '/_authenticated/instance-operations/$operationId': typeof AuthenticatedInstanceOperationsOperationIdRoute
   '/_authenticated/instances/$instanceId': typeof AuthenticatedInstancesInstanceIdRouteWithChildren
@@ -523,6 +577,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/login/callback'
     | '/login/'
+    | '/demo/a-1'
+    | '/demo/a-2'
+    | '/demo/b-1'
+    | '/demo/b-i-1'
+    | '/demo/b-i-2'
+    | '/demo/leaf'
     | '/filesystems/$filesystemId'
     | '/instance-operations/$operationId'
     | '/instances/$instanceId'
@@ -574,6 +634,12 @@ export interface FileRouteTypes {
     | '/login/callback'
     | '/'
     | '/login'
+    | '/demo/a-1'
+    | '/demo/a-2'
+    | '/demo/b-1'
+    | '/demo/b-i-1'
+    | '/demo/b-i-2'
+    | '/demo/leaf'
     | '/filesystems/$filesystemId'
     | '/instance-operations/$operationId'
     | '/instances/$instanceId'
@@ -626,6 +692,12 @@ export interface FileRouteTypes {
     | '/login/callback'
     | '/_authenticated/'
     | '/login/'
+    | '/_authenticated/demo/a-1'
+    | '/_authenticated/demo/a-2'
+    | '/_authenticated/demo/b-1'
+    | '/_authenticated/demo/b-i-1'
+    | '/_authenticated/demo/b-i-2'
+    | '/_authenticated/demo/leaf'
     | '/_authenticated/filesystems/$filesystemId'
     | '/_authenticated/instance-operations/$operationId'
     | '/_authenticated/instances/$instanceId'
@@ -935,6 +1007,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFilesystemsFilesystemIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/demo/leaf': {
+      id: '/_authenticated/demo/leaf'
+      path: '/demo/leaf'
+      fullPath: '/demo/leaf'
+      preLoaderRoute: typeof AuthenticatedDemoLeafRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/demo/b-i-2': {
+      id: '/_authenticated/demo/b-i-2'
+      path: '/demo/b-i-2'
+      fullPath: '/demo/b-i-2'
+      preLoaderRoute: typeof AuthenticatedDemoBI2RouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/demo/b-i-1': {
+      id: '/_authenticated/demo/b-i-1'
+      path: '/demo/b-i-1'
+      fullPath: '/demo/b-i-1'
+      preLoaderRoute: typeof AuthenticatedDemoBI1RouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/demo/b-1': {
+      id: '/_authenticated/demo/b-1'
+      path: '/demo/b-1'
+      fullPath: '/demo/b-1'
+      preLoaderRoute: typeof AuthenticatedDemoB1RouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/demo/a-2': {
+      id: '/_authenticated/demo/a-2'
+      path: '/demo/a-2'
+      fullPath: '/demo/a-2'
+      preLoaderRoute: typeof AuthenticatedDemoA2RouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/demo/a-1': {
+      id: '/_authenticated/demo/a-1'
+      path: '/demo/a-1'
+      fullPath: '/demo/a-1'
+      preLoaderRoute: typeof AuthenticatedDemoA1RouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/objects/$bucketId/': {
       id: '/_authenticated/objects/$bucketId/'
       path: '/'
@@ -1145,6 +1259,12 @@ const AuthenticatedObjectsBucketIdRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedDemoA1Route: typeof AuthenticatedDemoA1Route
+  AuthenticatedDemoA2Route: typeof AuthenticatedDemoA2Route
+  AuthenticatedDemoB1Route: typeof AuthenticatedDemoB1Route
+  AuthenticatedDemoBI1Route: typeof AuthenticatedDemoBI1Route
+  AuthenticatedDemoBI2Route: typeof AuthenticatedDemoBI2Route
+  AuthenticatedDemoLeafRoute: typeof AuthenticatedDemoLeafRoute
   AuthenticatedFilesystemsFilesystemIdRoute: typeof AuthenticatedFilesystemsFilesystemIdRoute
   AuthenticatedInstanceOperationsOperationIdRoute: typeof AuthenticatedInstanceOperationsOperationIdRoute
   AuthenticatedInstancesInstanceIdRoute: typeof AuthenticatedInstancesInstanceIdRouteWithChildren
@@ -1183,6 +1303,12 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedDemoA1Route: AuthenticatedDemoA1Route,
+  AuthenticatedDemoA2Route: AuthenticatedDemoA2Route,
+  AuthenticatedDemoB1Route: AuthenticatedDemoB1Route,
+  AuthenticatedDemoBI1Route: AuthenticatedDemoBI1Route,
+  AuthenticatedDemoBI2Route: AuthenticatedDemoBI2Route,
+  AuthenticatedDemoLeafRoute: AuthenticatedDemoLeafRoute,
   AuthenticatedFilesystemsFilesystemIdRoute:
     AuthenticatedFilesystemsFilesystemIdRoute,
   AuthenticatedInstanceOperationsOperationIdRoute:

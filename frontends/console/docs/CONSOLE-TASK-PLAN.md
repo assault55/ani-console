@@ -80,6 +80,7 @@
 | SCB-10 | 安全与密钥 | ✅ |
 | SCB-11 | 监控与用量 | ✅ |
 | SCB-12 | 占位页 | ⏸ 阻塞于 API |
+| SCB-02L | 顶栏一级 + 左 侧栏二级布局重构（用户显式覆盖冻结令） | ✅ |
 
 **规则**：先完成当前 SCB 再进入下一批；可与 P18+ 功能合批，但 SCB 序号不可跳。
 
@@ -148,7 +149,7 @@
 | 类型 | 命令 | 数量（2026-06-25） | 位置 |
 |------|------|-------------------|------|
 | 单元 | `npm run test:unit` | 80 | `src/**/*.test.{ts,tsx}` |
-| E2E | `npm run test:e2e` | 45 | `e2e/**/*.spec.ts` |
+| E2E | `npm run test:e2e` | 49 | `e2e/**/*.spec.ts` |
 | 全量 | `npm run verify` | 上两者 + codegen + tsc + build | `package.json` |
 
 E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
@@ -159,6 +160,7 @@ E2E 支撑：`e2e/support/api-mock.ts`、`auth.ts`；`scripts/ensure-e2e.mjs`
 
 | 日期 | 事项 |
 |------|------|
+| 2026-07-25 | SCB-02L 完成：顶栏一级 + 左 侧栏二级布局重构；用户显式覆盖设计规范 2.0 冻结令（仅壳层）；新增 `TopNav` / `Sidebar`，删除 `SideMenu`；49 e2e / 65 unit 全绿。过程记录见 [SPRINT-SCB-02L](./sprints/SPRINT-SCB-02L-top-nav-layout.md) |
 | 2026-07-14 | VM noVNC 控制台增加“适配窗口 / 原始尺寸”显示模式；原始尺寸关闭 noVNC 缩放并允许拖动画布，用于缓解鼠标坐标偏移 |
 | 2026-07-14 | 修复 Core API 401 会话失效处理：refresh 不可用时清理认证持久化并跳转 `/login?redirect=...`；默认门禁 82 unit / 47 e2e |
 | 2026-07-14 | 已部署 Console 到 isolated 集群：`docker.changqingyun.cn/ani/ani-console:dev-sandbox-template-ts7-20260714-105051`；代码提交 `4bc39dd`；`ani-console` rollout 成功，NodePort `30081` 返回 200 |

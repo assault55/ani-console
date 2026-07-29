@@ -11,7 +11,7 @@ test.describe('网络资源', () => {
   test('VPC 列表可打开详情 Drawer', async ({ page }) => {
     await page.goto('/networks/vpcs')
     await expect(page.getByRole('heading', { name: 'VPC' })).toBeVisible()
-    await expect(page.getByText('网络管理', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-component="sidebar"]')).toBeVisible()
     await page.getByRole('button', { name: 'prod-vpc' }).click()
     await expect(page.getByText('VPC详情 · prod-vpc')).toBeVisible()
     await expect(page.locator('.arco-drawer').getByText('10.0.0.0/16')).toBeVisible()

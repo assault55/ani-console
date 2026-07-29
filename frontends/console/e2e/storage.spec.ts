@@ -20,7 +20,7 @@ test.describe('存储详情', () => {
   })
 
   test('文件系统详情与挂载目标', async ({ page }) => {
-    // 已在 /volumes，storage-network 分组应已展开，勿再点子菜单标题（会折叠）
+    // 已在 /volumes，存储一级菜单激活，侧栏直接显示子项；点「文件存储」叶子跳转
     await page.getByRole('link', { name: '文件存储' }).click()
     await page.getByRole('link', { name: 'shared-fs' }).click()
     await expect(page).toHaveURL(/\/filesystems\/fs-1/)
