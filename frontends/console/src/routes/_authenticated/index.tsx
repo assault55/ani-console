@@ -10,12 +10,15 @@ import { StatusTag } from '@/components/shell/StatusTag'
 import { formatDateTime } from '@/lib/format'
 import { aggregateUsageByPeriod } from '@/lib/metering'
 import type { components } from '@/api/core-schema'
+import { AliIcon } from '@/components/icons/AliIcon'
+
+
 
 type GpuOccupancy = components['schemas']['GPUOccupancyStats']
 type InstanceOperation = components['schemas']['InstanceOperation']
 
 /** Arco 品牌色，与 Token 主色对齐 */
-const CHART_COLOR = '#165DFF'
+const CHART_COLOR = '#0079D3'
 
 function gpuOccupancyExtra(o: GpuOccupancy | undefined): string {
   if (!o) return '已用 0 / 可用 0'
@@ -91,7 +94,6 @@ function DashboardPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="概览" subtitle="租户资源与健康摘要" />
-
       {metricsError ? <ApiErrorAlert error={metricsError} title="核心指标加载失败" /> : null}
 
       {metricsLoading ? (

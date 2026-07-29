@@ -19,9 +19,6 @@ export function useBranding() {
   useEffect(() => {
     if (query.data) {
       setBranding(query.data)
-      if (query.data.primary_color) {
-        document.documentElement.style.setProperty('--primary-6', query.data.primary_color)
-      }
       if (query.data.favicon_url) {
         let link = document.querySelector<HTMLLinkElement>("link[rel='icon']")
         if (!link) {

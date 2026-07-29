@@ -56,7 +56,7 @@ function UsagePage() {
     tooltip: { trigger: 'axis' as const },
     xAxis: { type: 'category' as const, data: items.map((i) => i.period ?? '') },
     yAxis: { type: 'value' as const },
-    series: [{ type: 'bar' as const, data: items.map((i) => i.total_quantity ?? 0), itemStyle: { color: '#165DFF' } }],
+    series: [{ type: 'bar' as const, data: items.map((i) => i.total_quantity ?? 0), itemStyle: { color: '#0079D3' } }],
   }
 
   return (

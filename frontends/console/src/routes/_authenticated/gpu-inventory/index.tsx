@@ -14,7 +14,7 @@ export const Route = createFileRoute('/_authenticated/gpu-inventory/')({
   component: GpuInventoryPage,
 })
 
-const CHART_COLORS = ['#165DFF', '#00B42A']
+const CHART_COLORS = ['#0079D3', '#00B42A']
 
 type GpuRecord = components['schemas']['GPUInventoryRecord']
 

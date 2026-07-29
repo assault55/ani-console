@@ -1,3 +1,5 @@
+import { findMenuItem, isGroupItem, menuItems } from './menu-items'
+
 /** 根据当前 pathname 计算侧栏 Menu selectedKeys（最长前缀匹配）。 */
 export function matchSideMenuKey(pathname: string, routeKeys: string[]): string[] {
   const exact = routeKeys.find((k) => k === pathname)
@@ -18,18 +20,23 @@ const PATH_SUBMENU: { prefix: string; key: string }[] = [
   { prefix: '/instances/sandbox', key: 'compute' },
   { prefix: '/gpu-inventory', key: 'compute' },
   { prefix: '/sandbox-templates', key: 'compute' },
+  { prefix: '/k8s-clusters', key: 'colony' },
   { prefix: '/images', key: 'storage' },
   { prefix: '/volumes', key: 'storage' },
   { prefix: '/filesystems', key: 'storage' },
   { prefix: '/objects', key: 'storage' },
   { prefix: '/vector-stores', key: 'storage' },
   { prefix: '/networks', key: 'network-management' },
+  { prefix: '/registry', key: 'registry' },
+  { prefix: '/observability', key: 'observability' },
+  { prefix: '/usage', key: 'usage' },
   { prefix: '/encryption', key: 'security' },
   { prefix: '/secrets', key: 'security' },
   { prefix: '/settings', key: 'settings' },
   { prefix: '/bare-metal', key: 'reserved' },
   { prefix: '/notifications', key: 'reserved' },
   { prefix: '/audit', key: 'reserved' },
+  { prefix: '/demo', key: 'demo' },
 ]
 
 /** 当前路由应展开的 SubMenu keys（页面模板 2.0 §3 侧栏分组）。 */
@@ -37,3 +44,17 @@ export function openSubMenuKeysForPath(pathname: string): string[] {
   const hit = PATH_SUBMENU.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   return hit ? [hit.key] : []
 }
+
+/** 当前路由对应的一级菜单 key（叶子项返回 path，分组项返回 group key）。 */
+export function activeTopNavKeyForPath(pathname: string): string {
+  return openSubMenuKeysForPath(pathname)[0] ?? '/'
+}
+
+/** 该一级菜单的子项列表；无子项返回 null。 */
+export function sidebarItemsForTopNavKey(key: string) {
+  const item = findMenuItem(key)
+  if (!item) return null
+  return isGroupItem(item) ? item.children : null
+}
+
+export { menuItems }

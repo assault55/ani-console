@@ -574,7 +574,7 @@ test.describe('实例与算力', () => {
   test('GPU 清单页展示指标', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: '概览' })).toBeVisible({ timeout: 15000 })
-    await page.getByText('算力与实例').click()
+    await page.getByText('算力与实例', { exact: true }).click()
     await page.getByRole('link', { name: 'GPU 清单' }).click()
     await expect(page).toHaveURL(/\/gpu-inventory/)
     await expect(page.getByRole('heading', { name: 'GPU 清单' })).toBeVisible()

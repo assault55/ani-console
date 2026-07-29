@@ -1,83 +1,50 @@
-import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { Button, Layout, Modal, Typography, Space } from '@arco-design/web-react'
-import { SideMenu } from './SideMenu'
-import { useBrandingStore } from '@/stores/branding'
-import { coreApi } from '@/api/client'
-import { useAuthStore } from '@/stores/auth'
-import { newIdempotencyKey } from '@/lib/idempotency'
+import { Layout, Space, Typography } from '@arco-design/web-react'
+import { useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
+import { TopNav, TOPNAV_HEIGHT } from './TopNav'
+import { Sidebar, SIDEBAR_WIDTH } from './Sidebar'
+import { activeTopNavKeyForPath, sidebarItemsForTopNavKey } from '@/lib/side-menu-match'
 
-const { Header, Sider, Content } = Layout
-
-/** 页面模板 2.0 §3：顶栏 56–64px、侧栏 220–240px、内容区 padding 16–24px */
-const SHELL = {
-  headerHeight: 60,
-  siderWidth: 232,
-} as const
+const { Content } = Layout
 
 interface AppShellProps {
   children: React.ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const branding = useBrandingStore((s) => s.branding)
-  const name = branding?.platform_name ?? 'ANI Console'
-  const navigate = useNavigate()
-  const clear = useAuthStore((s) => s.clear)
-
-  const logout = useMutation({
-    mutationFn: async () => {
-      const jti = useAuthStore.getState().getAccessTokenJti()
-      if (!jti) throw new Error('当前 access token 缺少 jti，无法调用服务端登出')
-      const { error } = await coreApi.POST('/auth/logout', { body: { jti, idempotency_key: newIdempotencyKey() } })
-      if (error) throw error
-    },
-    onSettled: () => {
-      clear()
-      navigate({ to: '/login' })
-    },
-  })
-
-  const confirmLogout = () => {
-    Modal.confirm({
-      title: '确认退出登录',
-      content: '退出后需重新通过 OIDC 登录。',
-      okButtonProps: { status: 'danger' },
-      onOk: () => logout.mutateAsync(),
-    })
-  }
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const topNavKey = activeTopNavKeyForPath(pathname)
+  const sidebarItems = sidebarItemsForTopNavKey(topNavKey)
+  const showSidebar = pathname !== '/'
 
   return (
-    <Layout className="min-h-screen">
-      <Header
-        className="flex items-center justify-between border-b px-6"
-        style={{
-          height: SHELL.headerHeight,
-          borderColor: 'var(--color-border-2)',
-          background: 'var(--color-bg-2)',
-        }}
-      >
-        <Typography.Text className="text-base font-semibold">{name}</Typography.Text>
-        <Button type="text" status="danger" loading={logout.isPending} onClick={confirmLogout}>
-          退出登录
-        </Button>
-      </Header>
-      <Layout className="min-h-0 flex-1">
-        <Sider
-          className="border-r"
-          style={{
-            width: SHELL.siderWidth,
-            background: 'var(--color-bg-2)',
-            borderColor: 'var(--color-border-2)',
-          }}
-          breakpoint="lg"
-          collapsible
-        >
-          <SideMenu />
-        </Sider>
-        <Content className="p-5" style={{ background: 'var(--color-bg-1)' }}>
-          {children}
-        </Content>
+    <Layout className="min-h-screen" style={{ background: 'var(--color-bg-1)' }}>
+      <TopNav activeKey={topNavKey} />
+      <Layout className="min-h-0 flex-1" style={{ paddingTop: 0 }}>
+        {showSidebar ? (
+          <div className="flex min-h-0 flex-1">
+            <Sidebar
+              items={sidebarItems}
+              activePathname={pathname}
+              collapsed={sidebarCollapsed}
+              onCollapsedChange={setSidebarCollapsed}
+            />
+            <Content
+              className="flex-1 p-4"
+              style={{ background: '#F7F8FA', minWidth: 0 }}
+            >
+              {children}
+            </Content>
+          </div>
+        ) : (
+          <Content
+            className="flex-1 p-6"
+            style={{ background: '#F7F8FA', minWidth: 0 }}
+          >
+            {children}
+          </Content>
+        )}
       </Layout>
     </Layout>
   )
@@ -110,3 +77,5 @@ export function PageHeader({
     </header>
   )
 }
+
+export { TOPNAV_HEIGHT, SIDEBAR_WIDTH }

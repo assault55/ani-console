@@ -1,7 +1,9 @@
 import '@arco-design/web-react/dist/css/arco.css'
+import '@/assets/iconfont/iconfont.css'
 import '@/styles/global.css'
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { ConfigProvider } from '@arco-design/web-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
@@ -12,6 +14,8 @@ const queryClient = new QueryClient({
     queries: { retry: 1, refetchOnWindowFocus: false },
   },
 })
+
+const ARCO_THEME = { primaryColor: '#0079D3' }
 
 const router = createRouter({
   routeTree,
@@ -51,6 +55,8 @@ function App() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ConfigProvider theme={ARCO_THEME}>
+      <App />
+    </ConfigProvider>
   </StrictMode>,
 )
