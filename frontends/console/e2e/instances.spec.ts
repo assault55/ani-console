@@ -31,6 +31,35 @@ test.describe('实例与算力', () => {
     await popup.close()
   })
 
+  test('VM 详情使用统一分栏布局并支持收起详情栏', async ({ page }) => {
+    await page.goto('/instances/vm/vm_2krt5t')
+
+    await expect(page.getByRole('heading', { name: 'demo-resource-01' })).toBeVisible()
+    const header = page.getByTestId('detail-header')
+    await expect(header).toHaveCSS('height', '80px')
+    await expect(header).toContainText('规格')
+    await expect(header).toContainText('镜像')
+    await expect(header).toContainText('私网 IP')
+
+    const breadcrumb = page.getByLabel('详情面包屑')
+    await expect(breadcrumb).not.toContainText('首页')
+
+    const leftPane = page.getByTestId('detail-left-pane')
+    const rightPane = page.getByTestId('detail-right-pane')
+    const initialLeftWidth = await leftPane.evaluate((element) => element.getBoundingClientRect().width)
+    const initialRightWidth = await rightPane.evaluate((element) => element.getBoundingClientRect().width)
+    expect(initialLeftWidth).toBeGreaterThan(300)
+
+    await page.getByRole('button', { name: '收起详情栏' }).click()
+    await expect(page.getByTestId('detail-workspace')).toHaveAttribute('data-left-collapsed', 'true')
+    await expect
+      .poll(() => rightPane.evaluate((element) => element.getBoundingClientRect().width))
+      .toBeGreaterThan(initialRightWidth)
+
+    await page.getByRole('button', { name: '返回上一级' }).click()
+    await expect(page).toHaveURL(/\/instances\/vm$/)
+  })
+
   test('容器实例终端新页面连接 exec WebSocket', async ({ page }) => {
     let execBody: Record<string, unknown> | undefined
     let execAuthorization: string | null = null
@@ -573,7 +602,7 @@ test.describe('实例与算力', () => {
 
   test('GPU 清单页展示指标', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: '概览' })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByTestId('home-overview-page')).toBeVisible({ timeout: 15000 })
     await page.getByText('算力与实例', { exact: true }).click()
     await page.getByRole('link', { name: 'GPU 清单' }).click()
     await expect(page).toHaveURL(/\/gpu-inventory/)

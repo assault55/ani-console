@@ -8,7 +8,7 @@ import type {
   VmInstanceStatusCounts,
 } from './types'
 
-const initialMockInstances: VmInstance[] = [
+export const vmInstanceSeed: VmInstance[] = [
   {
     id: 'vm_2krt5t',
     name: 'demo-resource-01',
@@ -94,7 +94,32 @@ function compareText(left: string, right: string) {
   return left.localeCompare(right, 'zh-CN')
 }
 
-export function createMockVmInstanceDataSource(seed: VmInstance[] = initialMockInstances): VmInstanceDataSource {
+let sharedInstances = vmInstanceSeed.map((item) => ({ ...item }))
+
+export function resetSharedVmInstances(seed: VmInstance[] = vmInstanceSeed) {
+  sharedInstances = seed.map((item) => ({ ...item }))
+}
+
+export function listSharedVmInstances() {
+  return sharedInstances.map((item) => ({ ...item }))
+}
+
+export function getSharedVmInstance(instanceId: string) {
+  const instance = sharedInstances.find((item) => item.id === instanceId)
+  return instance ? { ...instance } : undefined
+}
+
+export function changeSharedVmInstancePowerState(ids: string[], action: VmInstancePowerAction) {
+  const idSet = new Set(ids)
+  const nextStatus: VmInstanceStatus = action === 'start' ? 'running' : 'stopped'
+  sharedInstances = sharedInstances.map((item) => {
+    if (!idSet.has(item.id)) return item
+    const canChange = action === 'start' ? item.status !== 'running' : item.status === 'running'
+    return canChange ? { ...item, status: nextStatus } : item
+  })
+}
+
+export function createMockVmInstanceDataSource(seed: VmInstance[] = vmInstanceSeed): VmInstanceDataSource {
   let instances = seed.map((item) => ({ ...item }))
 
   return {
@@ -134,4 +159,37 @@ export function createMockVmInstanceDataSource(seed: VmInstance[] = initialMockI
 }
 
 // Replace this binding with an API-backed implementation when the VM list endpoint is ready.
-export const vmInstanceDataSource: VmInstanceDataSource = createMockVmInstanceDataSource()
+export const vmInstanceDataSource: VmInstanceDataSource = {
+  async list(query: VmInstanceQuery): Promise<VmInstanceListResult> {
+    await waitForMockResponse()
+    const keyword = query.keyword.trim().toLocaleLowerCase()
+    let filtered = listSharedVmInstances().filter((item) => query.status === 'all' || item.status === query.status)
+
+    if (keyword) {
+      filtered = filtered.filter((item) => item[query.searchField].toLocaleLowerCase().includes(keyword))
+    }
+
+    if (query.sortField) {
+      const direction = query.sortDirection === 'asc' ? 1 : -1
+      filtered = [...filtered].sort((left, right) => compareText(left[query.sortField!], right[query.sortField!]) * direction)
+    }
+
+    const start = (query.page - 1) * query.pageSize
+    return {
+      items: filtered.slice(start, start + query.pageSize).map((item) => ({ ...item })),
+      total: filtered.length,
+      statusCounts: statusCounts(listSharedVmInstances()),
+    }
+  },
+
+  async changePowerState(ids: string[], action: VmInstancePowerAction) {
+    await waitForMockResponse()
+    changeSharedVmInstancePowerState(ids, action)
+  },
+}
+export const vmInstanceStore = {
+  list: listSharedVmInstances,
+  get: getSharedVmInstance,
+  changePowerState: changeSharedVmInstancePowerState,
+  reset: resetSharedVmInstances,
+}

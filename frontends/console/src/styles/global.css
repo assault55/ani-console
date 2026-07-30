@@ -40,15 +40,23 @@ body {
   flex: 0 0 auto;
   flex-direction: column;
   box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
   padding: 8px 8px 0;
-  overflow: visible;
+  overflow: hidden;
   transition: width 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
 }
 
 .sidebar-menu-region {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-component='page-scroll-region'] {
+  overscroll-behavior: contain;
 }
 
 /* 顶栏一级菜单：去除 Arco 默认底部边框，激活项下划线紧贴顶栏底部 */
@@ -82,7 +90,7 @@ body {
 /* 侧栏二级菜单：按 mockup page-detail-v2.html 一对一还原 */
 .sidebar-menu.arco-menu {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   background: transparent;
   padding: 0;
   line-height: 20px;
