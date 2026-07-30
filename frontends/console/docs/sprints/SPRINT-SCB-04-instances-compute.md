@@ -462,3 +462,29 @@ npx playwright test e2e/instances.spec.ts -g 'VM 和容器实例详情按运行�
 npm run typecheck
 npx playwright test e2e/instances.spec.ts
 ```
+
+---
+
+## 25. 全局详情页架构与 VM 详情接入（2026-07-30）
+
+按详情页 V2 参考稿新增统一 `DetailPageFrame`：面包屑移除“首页”并提供父级返回；头部固定 80px，支持状态、三项关键字段和右侧操作；正文采用 452px 左侧详情栏与自适应右侧 Tab 区域。左栏支持整体收起、数据驱动的多分类折叠，并保证至少一个分类保持展开。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/components/detailbase/*` | 新增统一详情页类型、布局样式、分类/分栏交互及组件单测 |
+| `src/views/vm/detail/*` | VM 演示详情接入统一布局，提供监控、云盘 Tab 与云盘详情数据 |
+| `src/routes/_authenticated/instances/vm/$instanceId*` | 接入 VM/云盘详情路由；演示实例使用新页面，其他实例保留 Core API 详情、VNC、终端与生命周期链路 |
+| `e2e/instances.spec.ts` | 覆盖 80px 头部、三项关键字段、无首页面包屑、详情栏收起与父级返回 |
+
+验收：
+
+```bash
+npm run typecheck
+npm run test -- DetailPageFrame.test.tsx
+npx playwright test e2e/instances.spec.ts -g 'VM 详情使用统一分栏布局并支持收起详情栏'
+npx playwright test e2e/instances.spec.ts -g 'VM 和容器实例详情按运行状态禁用启动停止按钮'
+npm run lint
+npm run build
+```
+
+补充验证：全量单测 108/109 通过，剩余失败为演示菜单数量断言与当前菜单改动不一致；全量 E2E 50/71 通过，21 条失败均停在旧首页标题“概览”的公共前置断言，与当前首页改版不一致。Windows 下 `npm run verify` 的 Bash/`spawnSync('npx')` 包装不可直接运行，OpenAPI 类型已按脚本指定版本分步生成并确认无内容差异。

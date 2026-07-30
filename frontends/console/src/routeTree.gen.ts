@@ -66,6 +66,7 @@ import { Route as AuthenticatedInstancesGpuCreateRouteImport } from './routes/_a
 import { Route as AuthenticatedInstancesContainerCreateRouteImport } from './routes/_authenticated/instances/container/create'
 import { Route as AuthenticatedInstancesContainerInstanceIdRouteImport } from './routes/_authenticated/instances/container/$instanceId'
 import { Route as AuthenticatedInstancesInstanceIdOperationsRouteImport } from './routes/_authenticated/instances/$instanceId.operations'
+import { Route as AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRouteImport } from './routes/_authenticated/instances/vm/$instanceId/volumes/$volumeId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -395,6 +396,12 @@ const AuthenticatedInstancesInstanceIdOperationsRoute =
     path: '/operations',
     getParentRoute: () => AuthenticatedInstancesInstanceIdRoute,
   } as any)
+const AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute =
+  AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRouteImport.update({
+    id: '/volumes/$volumeId',
+    path: '/volumes/$volumeId',
+    getParentRoute: () => AuthenticatedInstancesVmInstanceIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -444,7 +451,7 @@ export interface FileRoutesByFullPath {
   '/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
   '/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
-  '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
+  '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRouteWithChildren
   '/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
   '/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/networks/load-balancers/': typeof AuthenticatedNetworksLoadBalancersIndexRoute
@@ -453,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/networks/subnets/': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/networks/vpcs/': typeof AuthenticatedNetworksVpcsIndexRoute
   '/objects/$bucketId/': typeof AuthenticatedObjectsBucketIdIndexRoute
+  '/instances/vm/$instanceId/volumes/$volumeId': typeof AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute
 }
 export interface FileRoutesByTo {
   '/login/callback': typeof LoginCallbackRoute
@@ -500,7 +508,7 @@ export interface FileRoutesByTo {
   '/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
   '/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
-  '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
+  '/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRouteWithChildren
   '/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
   '/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/networks/load-balancers': typeof AuthenticatedNetworksLoadBalancersIndexRoute
@@ -509,6 +517,7 @@ export interface FileRoutesByTo {
   '/networks/subnets': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/networks/vpcs': typeof AuthenticatedNetworksVpcsIndexRoute
   '/objects/$bucketId': typeof AuthenticatedObjectsBucketIdIndexRoute
+  '/instances/vm/$instanceId/volumes/$volumeId': typeof AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -560,7 +569,7 @@ export interface FileRoutesById {
   '/_authenticated/instances/gpu/create': typeof AuthenticatedInstancesGpuCreateRoute
   '/_authenticated/instances/sandbox/$instanceId': typeof AuthenticatedInstancesSandboxInstanceIdRoute
   '/_authenticated/instances/sandbox/create': typeof AuthenticatedInstancesSandboxCreateRoute
-  '/_authenticated/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRoute
+  '/_authenticated/instances/vm/$instanceId': typeof AuthenticatedInstancesVmInstanceIdRouteWithChildren
   '/_authenticated/instances/vm/create': typeof AuthenticatedInstancesVmCreateRoute
   '/_authenticated/objects/$bucketId/$objectId': typeof AuthenticatedObjectsBucketIdObjectIdRoute
   '/_authenticated/networks/load-balancers/': typeof AuthenticatedNetworksLoadBalancersIndexRoute
@@ -569,6 +578,7 @@ export interface FileRoutesById {
   '/_authenticated/networks/subnets/': typeof AuthenticatedNetworksSubnetsIndexRoute
   '/_authenticated/networks/vpcs/': typeof AuthenticatedNetworksVpcsIndexRoute
   '/_authenticated/objects/$bucketId/': typeof AuthenticatedObjectsBucketIdIndexRoute
+  '/_authenticated/instances/vm/$instanceId/volumes/$volumeId': typeof AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -629,6 +639,7 @@ export interface FileRouteTypes {
     | '/networks/subnets/'
     | '/networks/vpcs/'
     | '/objects/$bucketId/'
+    | '/instances/vm/$instanceId/volumes/$volumeId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login/callback'
@@ -685,6 +696,7 @@ export interface FileRouteTypes {
     | '/networks/subnets'
     | '/networks/vpcs'
     | '/objects/$bucketId'
+    | '/instances/vm/$instanceId/volumes/$volumeId'
   id:
     | '__root__'
     | '/_authenticated'
@@ -744,6 +756,7 @@ export interface FileRouteTypes {
     | '/_authenticated/networks/subnets/'
     | '/_authenticated/networks/vpcs/'
     | '/_authenticated/objects/$bucketId/'
+    | '/_authenticated/instances/vm/$instanceId/volumes/$volumeId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1154,6 +1167,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInstancesInstanceIdOperationsRouteImport
       parentRoute: typeof AuthenticatedInstancesInstanceIdRoute
     }
+    '/_authenticated/instances/vm/$instanceId/volumes/$volumeId': {
+      id: '/_authenticated/instances/vm/$instanceId/volumes/$volumeId'
+      path: '/volumes/$volumeId'
+      fullPath: '/instances/vm/$instanceId/volumes/$volumeId'
+      preLoaderRoute: typeof AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRouteImport
+      parentRoute: typeof AuthenticatedInstancesVmInstanceIdRoute
+    }
   }
 }
 
@@ -1222,15 +1242,30 @@ const AuthenticatedInstancesSandboxRouteWithChildren =
     AuthenticatedInstancesSandboxRouteChildren,
   )
 
+interface AuthenticatedInstancesVmInstanceIdRouteChildren {
+  AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute: typeof AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute
+}
+
+const AuthenticatedInstancesVmInstanceIdRouteChildren: AuthenticatedInstancesVmInstanceIdRouteChildren =
+  {
+    AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute:
+      AuthenticatedInstancesVmInstanceIdVolumesVolumeIdRoute,
+  }
+
+const AuthenticatedInstancesVmInstanceIdRouteWithChildren =
+  AuthenticatedInstancesVmInstanceIdRoute._addFileChildren(
+    AuthenticatedInstancesVmInstanceIdRouteChildren,
+  )
+
 interface AuthenticatedInstancesVmRouteChildren {
-  AuthenticatedInstancesVmInstanceIdRoute: typeof AuthenticatedInstancesVmInstanceIdRoute
+  AuthenticatedInstancesVmInstanceIdRoute: typeof AuthenticatedInstancesVmInstanceIdRouteWithChildren
   AuthenticatedInstancesVmCreateRoute: typeof AuthenticatedInstancesVmCreateRoute
 }
 
 const AuthenticatedInstancesVmRouteChildren: AuthenticatedInstancesVmRouteChildren =
   {
     AuthenticatedInstancesVmInstanceIdRoute:
-      AuthenticatedInstancesVmInstanceIdRoute,
+      AuthenticatedInstancesVmInstanceIdRouteWithChildren,
     AuthenticatedInstancesVmCreateRoute: AuthenticatedInstancesVmCreateRoute,
   }
 

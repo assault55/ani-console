@@ -19,11 +19,19 @@ export function AppShell({ children }: AppShellProps) {
   const showSidebar = pathname !== '/'
 
   return (
-    <Layout className="min-h-screen" style={{ background: 'var(--color-bg-1)' }}>
+    <Layout
+      data-component="app-shell"
+      className="h-screen overflow-hidden"
+      style={{ background: 'var(--color-bg-1)' }}
+    >
       <TopNav activeKey={topNavKey} />
-      <Layout className="min-h-0 flex-1" style={{ paddingTop: 0 }}>
+      <Layout
+        data-component="app-body"
+        className="min-h-0 flex-1 overflow-hidden"
+        style={{ paddingTop: 0 }}
+      >
         {showSidebar ? (
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
             <Sidebar
               items={sidebarItems}
               activePathname={pathname}
@@ -31,7 +39,8 @@ export function AppShell({ children }: AppShellProps) {
               onCollapsedChange={setSidebarCollapsed}
             />
             <Content
-              className="flex-1 p-4"
+              data-component="page-scroll-region"
+              className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4"
               style={{ background: '#F7F8FA', minWidth: 0 }}
             >
               {children}
@@ -39,7 +48,8 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         ) : (
           <Content
-            className="flex-1 p-6"
+            data-component="page-scroll-region"
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pb-6 pt-4"
             style={{ background: '#F7F8FA', minWidth: 0 }}
           >
             {children}

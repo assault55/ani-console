@@ -57,9 +57,10 @@ export function TopNav({ activeKey }: TopNavProps) {
   return (
     <header
       data-component="topnav"
-      className="flex items-center justify-between border-b px-6"
+      className="box-border flex shrink-0 items-center justify-between border-b px-6"
       style={{
         height: TOPNAV_HEIGHT,
+        flexBasis: TOPNAV_HEIGHT,
         background: 'var(--color-bg-2)',
         borderColor: 'var(--color-border-2)',
       }}

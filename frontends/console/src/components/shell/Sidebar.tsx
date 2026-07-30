@@ -126,10 +126,9 @@ export function Sidebar({
         width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
         background: 'var(--color-bg-2)',
         borderColor: 'var(--color-border-2)',
-        minHeight: '100%',
       }}
     >
-      <div className="sidebar-menu-region">
+      <div className="sidebar-menu-region" data-component="sidebar-scroll-region">
         {items && items.length > 0 ? (
           <Menu
             id="sidebar-navigation-menu"
