@@ -488,3 +488,27 @@ npm run build
 ```
 
 补充验证：全量单测 108/109 通过，剩余失败为演示菜单数量断言与当前菜单改动不一致；全量 E2E 50/71 通过，21 条失败均停在旧首页标题“概览”的公共前置断言，与当前首页改版不一致。Windows 下 `npm run verify` 的 Bash/`spawnSync('npx')` 包装不可直接运行，OpenAPI 类型已按脚本指定版本分步生成并确认无内容差异。
+
+---
+
+## 26. 容器实例独立列表（2026-07-30）
+
+将 `/instances/container` 从通用实例列表中拆出，按 VM 列表的文件组织和 `pagebase` 页面骨架实现容器专用页面。列表继续使用 Core v1 `GET /instances?kind=container`，保留“名称、类型、VPC、子网、IP、状态、创建时间”字段，并补充“镜像、CPU / 内存、副本、发布、节点、访问地址”。创建和详情继续进入既有路由，不改动 VM、通用实例和公共组件实现。工具栏与 VM 列表保持一致，按勾选状态提供批量启动、停止和“更多”，右侧保留名称/ID 搜索；行内启动、停止、重启直接展示，详情、扩缩容、终端收纳到“更多”。除既有路由外，新增操作当前提供静态反馈。
+
+| 路径 | 变更摘要 |
+|------|----------|
+| `src/routes/_authenticated/instances/container.tsx` | 容器列表路由改为装载独立 `ContainerInstancesPage`，子级创建与详情 `Outlet` 行为保持不变 |
+| `src/views/container/*` | 新增容器列表页面、OpenAPI 类型映射、游标数据读取、状态/搜索筛选、原型字段映射、分页、排序、列设置、VM 同构批量操作栏与过渡状态轮询 |
+| `src/views/container/data-source.test.ts` | 覆盖 `container` 数据隔离、多页游标、删除态排除、筛选、搜索、排序、分页和容器部署字段映射 |
+| `e2e/container-instances.spec.ts` | 覆盖 `kind=container` 请求、完整列表字段、导出按钮、行操作及既有创建/详情路由 |
+
+验收：
+
+```bash
+npm run typecheck
+npm run test -- src/views/container/data-source.test.ts  # 3 passed
+npx playwright test e2e/container-instances.spec.ts      # 操作栏已按 VM 结构渲染；用例后续被既有“类型/VPC/子网/IP”列断言拦截
+npm run build
+```
+
+补充验证：全量单测 110/111 通过；唯一失败为既有 `side-menu-match.test.ts` 中 demo 菜单数量期望 1、实际 2，与本次容器页面变更无关，因此未修改公共菜单代码或测试。
