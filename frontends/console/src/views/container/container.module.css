@@ -1,0 +1,57 @@
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nameLink {
+  width: fit-content;
+  color: rgb(var(--primary-6));
+  font-size: 14px;
+  line-height: 20px;
+  text-decoration: none;
+}
+
+.nameLink:hover {
+  color: rgb(var(--primary-7));
+}
+
+.nameId {
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.columnSettings {
+  min-width: 150px;
+  padding: 4px 0;
+}
+
+.columnSettingItem {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  gap: 8px;
+  color: var(--color-text-1);
+  cursor: pointer;
+}
+
+.columnSettingItem:hover {
+  background: var(--color-fill-2);
+}
+
+.columnSettingItem input {
+  accent-color: rgb(var(--primary-6));
+}
+
+.moreMenuIcon {
+  margin-left: 3px;
+  font-size: 12px !important;
+}

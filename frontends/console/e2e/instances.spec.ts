@@ -369,6 +369,14 @@ test.describe('实例与算力', () => {
     })
 
     await page.goto('/instances/container/create')
+    await expect(page.getByRole('heading', { name: '创建容器实例' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '基本信息' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '配置信息' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '网络配置' })).toBeVisible()
+    await page.getByRole('button', { name: '创建实例' }).click()
+    await expect(page.getByText('请输入名称')).toBeVisible()
+    expect(createBodies).toHaveLength(0)
+
     await page.getByTestId('instance-name-input').fill('default-net')
     await page.getByRole('button', { name: '创建实例' }).click()
     expect(createBodies[0]?.network).toBeUndefined()

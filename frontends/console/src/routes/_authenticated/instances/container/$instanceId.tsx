@@ -1,11 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { InstanceDetailContent } from '../$instanceId'
+import { createFileRoute, useRouterState } from '@tanstack/react-router'
+import { ContainerInstanceDetailPage } from '@/views/container/detail'
 
 export const Route = createFileRoute('/_authenticated/instances/container/$instanceId')({
-  component: ContainerInstanceDetailPage,
+  component: ContainerInstanceDetailRoute,
 })
 
-function ContainerInstanceDetailPage() {
+function ContainerInstanceDetailRoute() {
   const { instanceId } = Route.useParams()
-  return <InstanceDetailContent instanceId={instanceId} returnTo="/instances/container" />
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  if (pathname !== `/instances/container/${instanceId}`) return null
+  return <ContainerInstanceDetailPage instanceId={instanceId} />
 }
